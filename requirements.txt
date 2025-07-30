@@ -2,9 +2,11 @@
 sounddevice>=0.4.6
 numpy>=1.21.0
 
-# For future speech processing components
-# openai-whisper>=20231117
-# torch>=2.0.0
+# Speech recognition with Whisper
+openai-whisper>=20231117
+torch>=2.0.0
+
+# For future AI response components
 # transformers>=4.30.0
 # pyttsx3>=2.90
 
