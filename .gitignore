@@ -1,1 +1,3 @@
 audio_config.json
+recording_*
+__pycache__/

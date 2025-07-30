@@ -10,3 +10,9 @@ numpy>=1.21.0
 
 # Utility libraries
 pydub>=0.25.1
+
+# Threading and async support (built-in to Python)
+# queue (built-in)
+# threading (built-in)
+# wave (built-in)
+# io (built-in)
