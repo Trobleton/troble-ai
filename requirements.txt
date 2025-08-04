@@ -1,20 +1,2 @@
-# Core audio processing
-sounddevice>=0.4.6
-numpy>=1.21.0
-
-# Speech recognition with Whisper
-openai-whisper>=20231117
-torch>=2.0.0
-
-# For future AI response components
-# transformers>=4.30.0
-# pyttsx3>=2.90
-
-# Utility libraries
-pydub>=0.25.1
-
-# Threading and async support (built-in to Python)
-# queue (built-in)
-# threading (built-in)
-# wave (built-in)
-# io (built-in)
+pyaudio==0.2.11
+numpy>=1.20.0
