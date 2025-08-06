@@ -17,7 +17,7 @@ def setup_logging(level=logging.DEBUG):
     handler = logging.StreamHandler()
     handler.setFormatter(formatter)
 
-    project_logger = logging.getLogger("speect_to_speech")
+    project_logger = logging.getLogger("speech_to_speech")
     project_logger.setLevel(level)
     project_logger.propagate = False
     if not project_logger.handlers:
