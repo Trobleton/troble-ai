@@ -117,7 +117,6 @@ class LLMWrapper:
         ).choices[0]
 
         response_text = response.message.content
-        print(response_text)
         response_text = self._filter_think(response_text)
         response_text = self._filter_emoji(response_text)
         response_text = self._filter_markdown(response_text)

@@ -42,7 +42,6 @@ class Recorder:
         frame_duration = self.framelength / self.recorder.sample_rate
         silence_threshold_sec = SILENCE_THRESHOLD
         silence_frames_required = int(silence_threshold_sec / frame_duration)
-        print(silence_frames_required)
         silence_frame_count = 0
 
         try:
@@ -55,7 +54,6 @@ class Recorder:
                 wav_file.writeframes(struct.pack("h" * len(frame), *frame))
 
                 voice_prob = self.cobra.process(pcm)
-                print(voice_prob)
 
                 if voice_prob <= VOICE_PROBABILITY:
                     silence_frame_count += 1

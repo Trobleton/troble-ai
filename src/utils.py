@@ -55,7 +55,6 @@ def play_wav_file(wav_bytes):
         exit()
 
     speaker = PvSpeaker(sample_rate=sample_rate, bits_per_sample=bits_per_sample, buffer_size_secs=20, device_index=0)
-    print("pvspeaker version: %s" % speaker.version)
     print("Using device: %s" % speaker.selected_device)
 
     wav_bytes = wav_file.readframes(num_samples)
