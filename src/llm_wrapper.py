@@ -30,9 +30,12 @@ class LLMWrapper:
     def _load_convo_history(self):
         logger.debug("Loading conversation history")
 
-        chat_history_file = open(self.chat_history_filename, 'r', encoding='utf-8')
-        self.global_chat_history =json.load(chat_history_file)['history']
-        chat_history_file.close()
+        try:
+            chat_history_file = open(self.chat_history_filename, 'r', encoding="utf-8")
+            self.global_chat_history = json.load(chat_history_file)['history']
+            chat_history_file.close()
+        except FileNotFoundError:
+            self.global_chat_history = []
 
         index = len(self.global_chat_history) - 1
         while index > -1 and((self.current_chat_history_length + self.initial_prompt_length) < self.max_tokens):

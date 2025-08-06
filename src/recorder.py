@@ -52,7 +52,7 @@ class Recorder:
                 frame = self.recorder.read()
                 pcm = np.array(frame, dtype=np.int16)
                 
-                wav_file.writeframes(struct.pack("h", len(frame), *frame))
+                wav_file.writeframes(struct.pack("h" * len(frame), *frame))
 
                 voice_prob = self.cobra.process(pcm)
                 print(voice_prob)

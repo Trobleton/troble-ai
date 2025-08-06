@@ -65,8 +65,8 @@ def main():
         play_wav_file(output_buffer)
         output_buffer.seek(0)
 
-    if __name__ == "__main__":
-        load_dotenv()
-        main()
+if __name__ == "__main__":
+    load_dotenv()
+    main()
 
         
