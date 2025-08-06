@@ -5,3 +5,5 @@ __pycache__/
 speech_ai_env/
 data/*
 .env
+chat_history.json
+output.wav

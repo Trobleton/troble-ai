@@ -14,6 +14,12 @@ from src.tts import TTS
 from src.utils import save_wav_file, play_wav_file
 from config import *
 
+import sys
+import os
+print("Python executable:", sys.executable)
+print("Current working directory:", os.getcwd())
+print("CUDA in PATH:", any("CUDA" in path for path in os.environ.get("PATH", "").split(";")))
+
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 logger = logging.getLogger("speech_to_speech.s2s_pipeline")
 

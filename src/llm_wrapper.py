@@ -20,6 +20,7 @@ class LLMWrapper:
         self.initial_prompt = INITIAL_PROMPT
         self.initial_prompt += "Do not style your response using markdown formatting. Note that your responses must be in a conversation format, thus no text formatting is allowed to make the output look nice after it has been rendered."
         self.initial_prompt += "Here are some rules regarding how the output should be formatted such that it could work with text-to-speech. 1. To adjust intonation, try punctuation ;:,.!?—…\"()“” or stress ˈ and ˌ"
+        self.initial_prompt += "try to keep the output short and concise."
         self.initial_prompt = self.initial_prompt.replace("\n", "")
         self.initial_prompt_length = len(self.initial_prompt.split(" "))
 

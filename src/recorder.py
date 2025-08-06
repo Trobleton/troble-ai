@@ -12,7 +12,7 @@ logger = logging.getLogger("speech_to_speech.voice_recording")
 
 class Recorder:
     def __init__(self, PICOVOICE_KEY):
-        self.porcupine = pvporcupine.create(access_key=PICOVOICE_KEY, keywords=[WAKE_KEYWORD])
+        self.porcupine = pvporcupine.create(access_key=PICOVOICE_KEY, keyword_paths=["public/Trouble_en_windows_v3_0_0.ppn"])
 
         self.cobra = pvcobra.create(access_key=PICOVOICE_KEY)
 
@@ -61,8 +61,6 @@ class Recorder:
                     silence_frame_count += 1
                 else:
                     silence_frame_count = 0
-                
-                print(silence_frame_count)
 
                 if silence_frame_count >= silence_frames_required:
                     logger.debug("Silence detected, stopping recording")
