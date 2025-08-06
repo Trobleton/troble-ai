@@ -12,6 +12,7 @@ from src.stt import STT
 from src.llm_wrapper import LLMWrapper
 from src.tts import TTS
 from src.utils import save_wav_file, play_wav_file
+from src.osc import VRChatOSC
 from config import *
 
 import sys
@@ -53,6 +54,7 @@ def main():
     )
     tts = TTS()
 
+    vrchat_osc = VRChatOSC()
     conversation_mode = False  # Set to True to keep listening after response
 
     while True:
@@ -64,13 +66,16 @@ def main():
             silence_threshold = 3  # 3 seconds for conversation mode
 
         logger.debug("Listening for command...")
+        vrchat_osc.send_message("(listening)")
         text, _ = listen_for_command(audio_recorder, whisper, silence_threshold=silence_threshold)
         if not text:
             if conversation_mode:
                 logger.debug("No command detected in conversation mode, exiting to wake word mode.")
                 conversation_mode = False
+                vrchat_osc.clear_message()
             continue
 
+        vrchat_osc.send_message("(thinking)")
         logger.debug("Sending to llm...")
         response = llm.send_to_llm(text)
         logger.info(response)
@@ -85,6 +90,7 @@ def main():
         output_buffer.seek(0)
 
         logger.debug("Playing response...")
+        vrchat_osc.clear_message()
         play_wav_file(output_buffer, device=AUDIO_OUT_DEVICE)
         output_buffer.seek(0)
 
