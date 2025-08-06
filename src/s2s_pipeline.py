@@ -65,7 +65,7 @@ def main():
         output_buffer.seek(0)
 
         logger.debug("Playing response...")
-        play_wav_file(output_buffer)
+        play_wav_file(output_buffer, device=AUDIO_OUT_DEVICE)
         output_buffer.seek(0)
 
 if __name__ == "__main__":

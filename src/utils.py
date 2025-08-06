@@ -27,7 +27,7 @@ def save_wav_file(wav_bytes, wav_filename):
         
         logger.debug(f"Audio successfully saved to {wav_filename}")
 
-def play_wav_file(wav_bytes):
+def play_wav_file(wav_bytes, device=-1):
     def blocking_call(speaker):
         speaker.flush()
     
@@ -54,7 +54,7 @@ def play_wav_file(wav_bytes):
         wav_file.close()
         exit()
 
-    speaker = PvSpeaker(sample_rate=sample_rate, bits_per_sample=bits_per_sample, buffer_size_secs=20, device_index=0)
+    speaker = PvSpeaker(sample_rate=sample_rate, bits_per_sample=bits_per_sample, buffer_size_secs=20, device_index=device)
     print("Using device: %s" % speaker.selected_device)
 
     wav_bytes = wav_file.readframes(num_samples)
