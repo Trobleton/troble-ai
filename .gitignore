@@ -2,4 +2,6 @@ audio_config.json
 recording_*
 __pycache__/
 .venv/
+speech_ai_env/
 data/*
+.env
