@@ -34,13 +34,13 @@ class Recorder:
         finally:
             self.recorder.stop()
     
-    def record_command(self):
+    def record_command(self, silence_threshold=SILENCE_THRESHOLD):
         wav_buffer = io.BytesIO()
         wav_file = wave.open(wav_buffer, 'wb')
         wav_file.setparams((1, 2, self.recorder.sample_rate, self.recorder.frame_length, 'NONE', 'NONE'))
 
         frame_duration = self.framelength / self.recorder.sample_rate
-        silence_threshold_sec = SILENCE_THRESHOLD
+        silence_threshold_sec = silence_threshold
         silence_frames_required = int(silence_threshold_sec / frame_duration)
         silence_frame_count = 0
 

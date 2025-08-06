@@ -91,6 +91,11 @@ class LLMWrapper:
         
         return filtered_text
     
+    def _filter_expressions(self, text):
+        # remove expressions like ~
+        filtered_text = re.sub(r"~", "", text)
+        return filtered_text
+    
     def send_to_llm(self, text):
         if not ENABLE_THINK:
             text = text + " /no_think" # disable reasoning
@@ -119,7 +124,8 @@ class LLMWrapper:
         response_text = response.message.content
         response_text = self._filter_think(response_text)
         response_text = self._filter_emoji(response_text)
-        response_text = self._filter_markdown(response_text)
+        # response_text = self._filter_markdown(response_text)
+        response_text = self._filter_expressions(response_text)
 
         response_length = len(response_text.split(" "))
 

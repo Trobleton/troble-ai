@@ -1,6 +1,6 @@
 # GLOBAL PARAMS
 DEVICE = "cuda" # either 'cuda' or 'cpu'
-AUDIO_IN_DEVICE = 0
+AUDIO_IN_DEVICE = 0 # 0 is mic, 10 is stream
 AUDIO_OUT_DEVICE = 3
 
 # Voice Recorder Parameters
