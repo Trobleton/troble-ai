@@ -53,30 +53,38 @@ class WebSearcher:
 
 
   def _fetch_wiki_content(self, website):
-    parsed_url = urlparse(website)
-    path_components = parsed_url.path[1:].split("/")
-    title = path_components[path_components.index("wiki") + 1]
-    title = unquote(title)  # Decode %20 etc.
-    
-    page = wikipedia.page(title, auto_suggest=False)
-    
-    return page.content.replace("\n", "")
+    try:
+      parsed_url = urlparse(website)
+      path_components = parsed_url.path[1:].split("/")
+      title = path_components[path_components.index("wiki") + 1]
+      title = unquote(title)  # Decode %20 etc.
+      
+      page = wikipedia.page(title, auto_suggest=False)
+      
+      return page.content.replace("\n", "")
+    except Exception as e:
+      logger.error(f"Error fetching Wikipedia content from {website}: {e}")
+      return None
 
 
   def _fetch_fandom_content(self, website):
-    fandom.set_user_agent(self.user_agents[random.randint(0, len(self.user_agents) - 1)])
-    parsed_url = urlparse(website)
-    
-    fandom_page = parsed_url.netloc.split(".")[0]
-    
-    path_components = parsed_url.path[1:].split("/")
-    title = path_components[path_components.index("wiki") + 1]
-    title = unquote(title)  # Decode %20 etc.
-    
-    fandom.set_wiki(fandom_page)
-    page = fandom.page(title)
-    
-    return page.plain_text.replace("\n", "")
+    try:
+      fandom.set_user_agent(self.user_agents[random.randint(0, len(self.user_agents) - 1)])
+      parsed_url = urlparse(website)
+      
+      fandom_page = parsed_url.netloc.split(".")[0]
+      
+      path_components = parsed_url.path[1:].split("/")
+      title = path_components[path_components.index("wiki") + 1]
+      title = unquote(title)  # Decode %20 etc.
+      
+      fandom.set_wiki(fandom_page)
+      page = fandom.page(title)
+      
+      return page.plain_text.replace("\n", "")
+    except Exception as e:
+      logger.error(f"Error fetching Fandom content from {website}: {e}")
+      return None
 
 
   def _fetch_other_content(self, website):

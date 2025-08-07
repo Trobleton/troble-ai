@@ -90,7 +90,7 @@ def main():
                 audio_recorder.record_wake_word()
                 silence_threshold = SILENCE_THRESHOLD  # Use your normal threshold
             else:
-                silence_threshold = SILENCE_THRESHOLD + 1  # Slightly longer for conversation mode
+                silence_threshold = SILENCE_THRESHOLD - 1  # Slightly shorter for conversation mode
 
             logger.debug("Listening for command...")
             vrchat_osc.send_message("(listening)")
@@ -186,32 +186,38 @@ def main():
         logger.debug("Playing response...")
         vrchat_osc.clear_message()
         
-        # Create interrupt event for wake word detection during playback
-        interrupt_event = threading.Event()
-        
-        # Start wake word detection in separate thread during playback
-        wake_word_thread = threading.Thread(
-            target=audio_recorder.listen_for_wake_word_with_interrupt, 
-            args=(interrupt_event,)
-        )
-        wake_word_thread.start()
-        
-        # Play audio with interruption capability
-        logger.debug("Starting interruptible playback...")
-        playback_completed = play_wav_file_interruptible(
-            output_buffer, 
-            device=AUDIO_OUT_DEVICE, 
-            interrupt_event=interrupt_event
-        )
-        
-        # Signal wake word thread to stop if audio completed normally
-        if playback_completed:
-            interrupt_event.set()
-        
-        # Wait for wake word thread to finish
-        logger.debug("Waiting for wake word thread to join...")
-        wake_word_thread.join()
-        logger.debug("Wake word thread joined")
+        if ENABLE_INTERRUPTION:
+            # Create interrupt event for wake word detection during playback
+            interrupt_event = threading.Event()
+            
+            # Start wake word detection in separate thread during playback
+            wake_word_thread = threading.Thread(
+                target=audio_recorder.listen_for_wake_word_with_interrupt, 
+                args=(interrupt_event,)
+            )
+            wake_word_thread.start()
+            
+            # Play audio with interruption capability
+            logger.debug("Starting interruptible playback...")
+            playback_completed = play_wav_file_interruptible(
+                output_buffer, 
+                device=AUDIO_OUT_DEVICE, 
+                interrupt_event=interrupt_event
+            )
+            
+            # Signal wake word thread to stop if audio completed normally
+            if playback_completed:
+                interrupt_event.set()
+            
+            # Wait for wake word thread to finish
+            logger.debug("Waiting for wake word thread to join...")
+            wake_word_thread.join()
+            logger.debug("Wake word thread joined")
+        else:
+            # Play audio without interruption capability
+            logger.debug("Starting non-interruptible playback...")
+            play_wav_file(output_buffer, device=AUDIO_OUT_DEVICE)
+            playback_completed = True
         
         output_buffer.seek(0)
         
