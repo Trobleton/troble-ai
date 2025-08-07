@@ -71,7 +71,7 @@ def main():
                 audio_recorder.record_wake_word()
                 silence_threshold = SILENCE_THRESHOLD  # Use your normal threshold
             else:
-                silence_threshold = 3  # 3 seconds for conversation mode
+                silence_threshold = SILENCE_THRESHOLD + 1  # Slightly longer for conversation mode
 
             logger.debug("Listening for command...")
             vrchat_osc.send_message("(listening)")
@@ -118,6 +118,10 @@ def main():
             interrupt_event=interrupt_event
         )
         
+        # Signal wake word thread to stop if audio completed normally
+        if playback_completed:
+            interrupt_event.set()
+        
         # Wait for wake word thread to finish
         logger.debug("Waiting for wake word thread to join...")
         wake_word_thread.join()
@@ -134,7 +138,7 @@ def main():
             logger.debug("Response completed, brief listening for next command...")
             # Listen briefly for next command after audio completion
             vrchat_osc.send_message("(listening)")
-            brief_silence_threshold = 3  # 3 seconds timeout for brief listening
+            brief_silence_threshold = SILENCE_THRESHOLD
             text, _ = listen_for_command(audio_recorder, whisper, silence_threshold=brief_silence_threshold)
             vrchat_osc.clear_message()
             

@@ -54,8 +54,12 @@ class LLMWrapper:
 
     def _filter_think(self, text):
         marker = "</think>"
-        index = text.find(marker) + len(marker)
-        filtered_text = text[index:].replace("\n", "")
+        marker_index = text.find(marker)
+        if marker_index != -1:
+            index = marker_index + len(marker)
+            filtered_text = text[index:].replace("\n", "")
+        else:
+            filtered_text = text.replace("\n", "")
 
         return filtered_text
     

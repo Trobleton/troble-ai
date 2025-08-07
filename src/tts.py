@@ -36,8 +36,8 @@ class TTS:
         audio_duration = 0
 
         try:
-            # Add 50ms of silence at the start
-            silence = np.zeros(int(0.05 * self.samplerate), dtype=np.int16)
+            # Add 200ms of silence at the start to prevent cutoff
+            silence = np.zeros(int(0.2 * self.samplerate), dtype=np.int16)
             wav_file.writeframes(silence.tobytes())
 
             generator = self.client(text, voice=self.voice)
