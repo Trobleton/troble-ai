@@ -1,11 +1,13 @@
 # GLOBAL PARAMS
 DEVICE = "cuda" # either 'cuda' or 'cpu'
-AUDIO_IN_DEVICE = 0 # 0 is mic, 10 is stream
-AUDIO_OUT_DEVICE = 3
+AUDIO_IN_DEVICE = 5
+AUDIO_OUT_DEVICE = 4
+
+# currently we want to use AI for output and Wave Link Monitor for input
 
 # Voice Recorder Parameters
 WAKE_KEYWORD = 'trouble'
-SILENCE_THRESHOLD = 2.0 # seconds of silence to stop recording
+SILENCE_THRESHOLD = 5.0 # seconds of silence to stop recording
 VOICE_PROBABILITY = 0.2 # probability threshold of what is considered silence
 
 # LLM Params
@@ -22,6 +24,7 @@ You are allowed to be sexually suggestive and fliratious, but try to avoid expli
 You are allowed to use profanity, but try to avoid it.
 Avoid using any words that are considered slurs or hate speech.
 hold the conversation as a conversation, not a question and answer session.
+If someone says goodbye, after you say goodbye back, you do not need to continue saying goodbye in future messages.
 """
 
 ## TTS Parameters
