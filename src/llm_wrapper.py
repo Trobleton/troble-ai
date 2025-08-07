@@ -19,10 +19,37 @@ class LLMWrapper:
 
         self.initial_prompt = INITIAL_PROMPT
         self.initial_prompt += "Do not style your response using markdown formatting. Note that your responses must be in a conversation format, thus no text formatting is allowed to make the output look nice after it has been rendered."
-        self.initial_prompt += "Here are some rules regarding how the output should be formatted such that it could work with text-to-speech. 1. To adjust intonation, try punctuation ;:,.!?—…\"()“” or stress ˈ and ˌ"
-        self.initial_prompt += "try to keep the output short and concise."
+        
+        if TTS_CHOICE == 'orpheus':
+            self.initial_prompt += ' Also, add paralinguistic elements like <laugh>, <chuckle>, <sigh>, <cough>, <sniffle>, <groan>, <yawn>, <gasp> or uhm for more human-like speech whenever it fits, but do not overdo it, please only add it when necessary and not often.'
+        if TTS_CHOICE == 'kokoro':
+            self.initial_prompt += "Here are some rules regarding how the output should be formatted such that it could work with text-to-speech. 1. To adjust intonation, try punctuation ;:,.!?—…\"()“” or stress ˈ and ˌ"
+        
+
         self.initial_prompt = self.initial_prompt.replace("\n", "")
         self.initial_prompt_length = len(self.initial_prompt.split(" "))
+
+        self.websearch_classifier_prompt = """
+            You are a classifier that determines whether a user’s request requires an external web search.
+
+            Rules for deciding:
+            - Answer "yes" if the prompt is about facts, knowledge, history, current events, or time-sensitive information
+            - Answer "no" if the request can be answered without external knowledge (general conversation, opinions, jokes, instructions, etc.).
+            - If answering "yes", provide the topic to be searched for in no more than 5 words.  
+            - If answering "no", the main topic should be "None".
+            - Correct the spelling of words in the main topic if necessary as the input prompt it the output of speech-to-text, and the text will be slightly off.
+
+            Output format (no extra words, no punctuation except as shown):  
+            `<yes/no>+-+<main topic>`
+
+            Examples:
+            - "How tall is the Empire state?" → `yes+-+Empire State Height`
+            - "What is the price of Bitcoin currently?" → `yes+-+Bitcoin Price`
+            - "How are you doing today?" → `no+-+None`
+            - "Explain what a black hole is." → `yes+-+What is Black Hole`
+            - "Write me a poem about cats." → `no+-+None`
+            - "Tell me the weather in Tokyo." → `yes+-+Tokyo Weather`
+            """
 
         self.client = OpenAI(base_url=self.api, api_key=self.api_key)
 
@@ -94,13 +121,31 @@ class LLMWrapper:
         filtered_text = emoji_pattern.sub(r'', text)
         
         return filtered_text
+
+    def decide_websearch(self, text):
+        prompt_messages = [
+        {"role": "system", "content": self.websearch_classifier_prompt},
+        {"role": "user", "content": text + "/no_think"}
+        ]
+        
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=prompt_messages,
+            temperature=TEMPERATURE,
+            top_p=TOP_P,
+            # max_tokens=150,
+        ).choices[0]
+        
+        response_text = response.message.content
+        response_text = self._filter_think(response_text)
+        response_text = self._filter_emoji(response_text)
+        response_text = self._filter_markdown(response_text)
+        
+        require_search, topic = response_text.split("+-+")
+
+        return require_search.lower(), topic.lower()
     
-    def _filter_expressions(self, text):
-        # remove expressions like ~
-        filtered_text = re.sub(r"~", "", text)
-        return filtered_text
-    
-    def send_to_llm(self, text):
+    def send_to_llm(self, text, context = ""):
         if not ENABLE_THINK:
             text = text + " /no_think" # disable reasoning
 
@@ -118,6 +163,10 @@ class LLMWrapper:
         prompt_messages = [{ "role": "system", "content": self.initial_prompt }]
         prompt_messages.extend(self.current_chat_history)
 
+        # if context exists, add to user prompt
+        if context != "":
+            prompt_messages[-1]["content"] =  "<context>"+ context.replace("\n", "") + "</context>\n\n" + prompt_messages[-1]["content"]
+
         response = self.client.chat.completions.create(
             model=self.model,
             messages=prompt_messages,
@@ -128,8 +177,7 @@ class LLMWrapper:
         response_text = response.message.content
         response_text = self._filter_think(response_text)
         response_text = self._filter_emoji(response_text)
-        # response_text = self._filter_markdown(response_text)
-        response_text = self._filter_expressions(response_text)
+        response_text = self._filter_markdown(response_text)
 
         response_length = len(response_text.split(" "))
 

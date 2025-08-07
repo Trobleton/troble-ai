@@ -113,6 +113,10 @@ def play_wav_file_interruptible(wav_bytes, device=-1, interrupt_event=None):
     bits_per_sample = wav_file.getsampwidth() * 8
     num_channels = wav_file.getnchannels()
     num_samples = wav_file.getnframes()
+    
+    # Calculate expected duration
+    expected_duration = num_samples / sample_rate
+    logger.debug(f"Audio info: {num_samples} samples, {sample_rate}Hz, {expected_duration:.2f}s duration")
 
     if bits_per_sample not in [8, 16, 24, 32]:
         logger.error(f"Unsupported bits per sample: {bits_per_sample}")
@@ -121,6 +125,11 @@ def play_wav_file_interruptible(wav_bytes, device=-1, interrupt_event=None):
     
     if num_channels != 1:
         logger.error(f"WAV file must have a single channel (MONO)")
+        wav_file.close()
+        return False
+    
+    if num_samples == 0:
+        logger.error("Audio file has no samples")
         wav_file.close()
         return False
 
@@ -148,6 +157,9 @@ def play_wav_file_interruptible(wav_bytes, device=-1, interrupt_event=None):
     print("Playing audio...")
     interrupted = False
     
+    import time
+    start_time = time.time()
+    
     for pcm_sublist in pcm_list:
         if interrupt_event and interrupt_event.is_set():
             interrupted = True
@@ -166,7 +178,8 @@ def play_wav_file_interruptible(wav_bytes, device=-1, interrupt_event=None):
             break
     
     if interrupted:
-        logger.debug("Audio playback interrupted during main loop")
+        actual_duration = time.time() - start_time
+        logger.debug(f"Audio playbook interrupted during main loop after {actual_duration:.2f}s")
         speaker.stop()
         wav_file.close()
         return False
@@ -185,7 +198,8 @@ def play_wav_file_interruptible(wav_bytes, device=-1, interrupt_event=None):
         completion_event.wait(timeout=0.1)
     
     if interrupted:
-        logger.debug("Audio playback interrupted during flush")
+        actual_duration = time.time() - start_time
+        logger.debug(f"Audio playback interrupted during flush after {actual_duration:.2f}s")
         speaker.stop()
         wav_file.close()
         return False
@@ -193,6 +207,12 @@ def play_wav_file_interruptible(wav_bytes, device=-1, interrupt_event=None):
     worker_thread.join()
     speaker.stop()
 
-    logger.debug("Audio playback completed successfully, returning True")
+    actual_duration = time.time() - start_time
+    logger.debug(f"Audio playback completed successfully. Expected: {expected_duration:.2f}s, Actual: {actual_duration:.2f}s")
+    
+    # Check if playback ended significantly early (more than 0.5 seconds difference)
+    if expected_duration - actual_duration > 0.5:
+        logger.warning(f"Audio ended {expected_duration - actual_duration:.2f}s early - possible audio truncation")
+    
     wav_file.close()
     return True

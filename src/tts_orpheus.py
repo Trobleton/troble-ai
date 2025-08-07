@@ -87,18 +87,35 @@ class TTSOrpheus:
     """Asynchronous token decoder that converts token stream to audio stream."""
     buffer = []
     count = 0
+    last_processed_idx = 0  # Track the last token we processed to avoid repetition
+    
     async for token_text in token_gen:
       token = self._turn_token_into_id(token_text, count)
       if token is not None and token > 0:
         buffer.append(token)
         count += 1
         
-        # Convert to audio when we have enough tokens
-        if count % 7 == 0 and count > 27:
+        # Convert to audio when we have enough tokens and haven't processed these yet
+        if count % 7 == 0 and count > 27 and count > last_processed_idx:
           buffer_to_proc = buffer[-28:]
           audio_samples = self._convert_to_audio(buffer_to_proc, count)
           if audio_samples is not None:
+            last_processed_idx = count  # Mark this position as processed
             yield audio_samples
+    
+    # Process any remaining tokens at the end that weren't divisible by 7
+    if count > last_processed_idx and count > 27:
+      logger.debug(f"Processing final tokens: count={count}, last_processed={last_processed_idx}, buffer_size={len(buffer)}")
+      buffer_to_proc = buffer[-28:] if len(buffer) >= 28 else buffer
+      if len(buffer_to_proc) >= 7:  # Need at least 7 tokens for processing
+        audio_samples = self._convert_to_audio(buffer_to_proc, count)
+        if audio_samples is not None:
+          logger.debug("Generated final audio chunk")
+          yield audio_samples
+      else:
+        logger.warning(f"Skipping final tokens - insufficient count: {len(buffer_to_proc)}")
+    else:
+      logger.debug(f"No final tokens to process: count={count}, last_processed={last_processed_idx}")
 
   def _tokens_decoder_sync(self, syn_token_gen, wav_file):
     """Synchronous wrapper for the asynchronous token decoder."""
@@ -186,4 +203,13 @@ class TTSOrpheus:
       wav_file.close()
       
     return wav_buffer, audio_duration
+  
+  def synthesize_streaming(self, text):
+    """Return an async generator that yields audio chunks as they're ready"""
+    speech_token_generator = self._generate_tokens_from_api(text)
+    return self._tokens_decoder(self._convert_sync_to_async_generator(speech_token_generator))
+  
+  async def _convert_sync_to_async_generator(self, sync_gen):
+    for item in sync_gen:
+      yield item
   

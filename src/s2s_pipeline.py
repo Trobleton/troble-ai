@@ -14,15 +14,20 @@ from src.tts_kokoro import TTSKokoro
 from src.tts_orpheus import TTSOrpheus
 from src.utils import save_wav_file, play_wav_file, play_wav_file_interruptible
 from src.osc import VRChatOSC
+from src.web_search import WebSearcher
+from src.rag_langchain import RAGLangchain
 from config import *
 
-import sys
 import os
-from typing import Tuple, Optional
 import threading
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 logger = logging.getLogger("speech_to_speech.s2s_pipeline")
+
+def searching_speech_worker(tts, text):
+  output_buffer, output_duration = tts.synthesize(text)
+  output_buffer.seek(0)
+  play_wav_file(output_buffer)
 
 def listen_for_command(
     audio_recorder: Recorder,
@@ -54,6 +59,8 @@ def main():
         api=os.getenv("OPENAI_API"),
         api_key=os.getenv("OPENAI_API_KEY")
     )
+    websearch = WebSearcher()
+    rag = RAGLangchain()
     
     if TTS_CHOICE == "kokoro":
         tts = TTSKokoro()
@@ -68,6 +75,9 @@ def main():
     pending_text = None  # Store text from brief listening period
 
     while True:
+        import time
+        pipeline_start = time.time()
+        
         # Check if we have pending text from brief listening period
         if pending_text:
             text = pending_text
@@ -84,27 +94,94 @@ def main():
 
             logger.debug("Listening for command...")
             vrchat_osc.send_message("(listening)")
+            stt_start = time.time()
             text, _ = listen_for_command(audio_recorder, whisper, silence_threshold=silence_threshold)
+            stt_time = time.time() - stt_start
+            logger.debug(f"STT took {stt_time:.2f}s")
+            
             if not text:
                 if conversation_mode:
                     logger.debug("No command detected in conversation mode, exiting to wake word mode.")
                     conversation_mode = False
                     vrchat_osc.clear_message()
                 continue
+        
+        rag_start = time.time()
+        decision, topic = llm.decide_websearch(text)
+        decision_time = time.time() - rag_start
+        logger.debug(f"LLM decision took {decision_time:.2f}s. Websearch recommended?: {decision} - {topic}")
+        
+        context = ""
+        query_results = []
+        query_result_scores = [0]  # Initialize with default value
+
+        if decision == "yes":
+            logger.debug(f"Querying RAG")
+            query_results = rag.query(topic)
+            # add extra 0 in case RAG is empty and returns empty list
+            query_result_scores = [query["score"] for query in query_results] + [0]
+
+            if  max(query_result_scores) < RAG_CONFIDENCE_THRESHOLD:
+                logger.debug(f"Not enough confident info in RAG, requires search")
+                
+                # Play search speech while web search occurs
+                speech_thread = threading.Thread(target=searching_speech_worker, args=(tts, f"Searching the web for {topic}"))
+                speech_thread.start()
+                
+                search_start = time.time()
+                websites = websearch.ddg_search(text)
+                logger.debug(f"Fetching website contents")
+                web_contents = websearch.fetch_content(websites)
+                search_time = time.time() - search_start
+                logger.debug(f"Web search took {search_time:.2f}s")
+
+                logger.debug(f"Adding contents to RAG")
+                for document in web_contents:
+                    rag.add_document(document)
+
+                logger.debug(f"Querying RAG Again")
+                query_results = rag.query(topic)
+                logger.info(query_results)
+
+                # Ensure search speech completes before continuing
+                logger.debug("Waiting for search speech to complete...")
+                speech_thread.join()
+                logger.debug("Search speech completed")
+                
+                # Small delay to ensure audio device is fully released
+                import time
+                time.sleep(0.2)
+            else:
+                logger.debug(f"Info in RAG exists, no search needed")
+        
+        rag_time = time.time() - rag_start
+        logger.debug(f"Total RAG/search phase took {rag_time:.2f}s")
+        
+        for result in query_results:
+            context += result["content"]
 
         vrchat_osc.send_message("(thinking)")
         logger.debug("Sending to llm...")
+        llm_start = time.time()
         response = llm.send_to_llm(text)
+        llm_time = time.time() - llm_start
+        logger.debug(f"LLM response took {llm_time:.2f}s")
         logger.info(response)
 
         logger.debug("Synthesizing response...")
+        tts_start = time.time()
         output_buffer, output_duration = tts.synthesize(response)
+        tts_time = time.time() - tts_start
+        logger.debug(f"TTS took {tts_time:.2f}s")
 
         output_buffer.seek(0)
         output_filename = "output.wav"
         logger.debug("Saving wav file...")
         save_wav_file(output_buffer, output_filename)
         output_buffer.seek(0)
+        
+        total_time = time.time() - pipeline_start
+        logger.info(f"PIPELINE TIMING - Total: {total_time:.2f}s | STT: {stt_time:.2f}s | LLM: {llm_time:.2f}s | TTS: {tts_time:.2f}s | RAG: {rag_time:.2f}s")
 
         logger.debug("Playing response...")
         vrchat_osc.clear_message()
