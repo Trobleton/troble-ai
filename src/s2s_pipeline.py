@@ -11,13 +11,14 @@ from src.recorder import Recorder
 from src.stt import STT
 from src.llm_wrapper import LLMWrapper
 from src.tts import TTS
-from src.utils import save_wav_file, play_wav_file
+from src.utils import save_wav_file, play_wav_file, play_wav_file_interruptible
 from src.osc import VRChatOSC
 from config import *
 
 import sys
 import os
 from typing import Tuple, Optional
+import threading
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 logger = logging.getLogger("speech_to_speech.s2s_pipeline")
@@ -56,24 +57,31 @@ def main():
 
     vrchat_osc = VRChatOSC()
     conversation_mode = False  # Set to True to keep listening after response
+    pending_text = None  # Store text from brief listening period
 
     while True:
-        if not conversation_mode:
-            logger.debug("Listening for wake word...")
-            audio_recorder.record_wake_word()
-            silence_threshold = SILENCE_THRESHOLD  # Use your normal threshold
+        # Check if we have pending text from brief listening period
+        if pending_text:
+            text = pending_text
+            pending_text = None
+            logger.debug("Processing pending command from brief listening period")
         else:
-            silence_threshold = 3  # 3 seconds for conversation mode
+            if not conversation_mode:
+                logger.debug("Listening for wake word...")
+                audio_recorder.record_wake_word()
+                silence_threshold = SILENCE_THRESHOLD  # Use your normal threshold
+            else:
+                silence_threshold = 3  # 3 seconds for conversation mode
 
-        logger.debug("Listening for command...")
-        vrchat_osc.send_message("(listening)")
-        text, _ = listen_for_command(audio_recorder, whisper, silence_threshold=silence_threshold)
-        if not text:
-            if conversation_mode:
-                logger.debug("No command detected in conversation mode, exiting to wake word mode.")
-                conversation_mode = False
-                vrchat_osc.clear_message()
-            continue
+            logger.debug("Listening for command...")
+            vrchat_osc.send_message("(listening)")
+            text, _ = listen_for_command(audio_recorder, whisper, silence_threshold=silence_threshold)
+            if not text:
+                if conversation_mode:
+                    logger.debug("No command detected in conversation mode, exiting to wake word mode.")
+                    conversation_mode = False
+                    vrchat_osc.clear_message()
+                continue
 
         vrchat_osc.send_message("(thinking)")
         logger.debug("Sending to llm...")
@@ -91,11 +99,56 @@ def main():
 
         logger.debug("Playing response...")
         vrchat_osc.clear_message()
-        play_wav_file(output_buffer, device=AUDIO_OUT_DEVICE)
+        
+        # Create interrupt event for wake word detection during playback
+        interrupt_event = threading.Event()
+        
+        # Start wake word detection in separate thread during playback
+        wake_word_thread = threading.Thread(
+            target=audio_recorder.listen_for_wake_word_with_interrupt, 
+            args=(interrupt_event,)
+        )
+        wake_word_thread.start()
+        
+        # Play audio with interruption capability
+        logger.debug("Starting interruptible playback...")
+        playback_completed = play_wav_file_interruptible(
+            output_buffer, 
+            device=AUDIO_OUT_DEVICE, 
+            interrupt_event=interrupt_event
+        )
+        
+        # Wait for wake word thread to finish
+        logger.debug("Waiting for wake word thread to join...")
+        wake_word_thread.join()
+        logger.debug("Wake word thread joined")
+        
         output_buffer.seek(0)
-
-        logger.debug("Response completed, listening for next command...")
-        conversation_mode = True
+        
+        logger.debug(f"About to check if playback_completed ({playback_completed}) is True")
+        logger.debug(f"playback_completed == True: {playback_completed == True}")
+        logger.debug(f"bool(playback_completed): {bool(playback_completed)}")
+        
+        if playback_completed:
+            logger.debug("Entering playback completed branch")
+            logger.debug("Response completed, brief listening for next command...")
+            # Listen briefly for next command after audio completion
+            vrchat_osc.send_message("(listening)")
+            brief_silence_threshold = 3  # 3 seconds timeout for brief listening
+            text, _ = listen_for_command(audio_recorder, whisper, silence_threshold=brief_silence_threshold)
+            vrchat_osc.clear_message()
+            
+            if text:
+                logger.debug("Command detected during brief listening period")
+                conversation_mode = True
+                pending_text = text  # Store for next loop iteration
+            else:
+                logger.debug("No command during brief listening, returning to wake word mode")
+                conversation_mode = False
+        else:
+            logger.debug("Entering playback interrupted branch")
+            logger.debug("Response interrupted by wake word, listening for command immediately...")
+            conversation_mode = True  # Stay in conversation mode to skip wake word detection
 
 if __name__ == "__main__":
     load_dotenv()

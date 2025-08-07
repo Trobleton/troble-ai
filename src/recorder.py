@@ -68,3 +68,19 @@ class Recorder:
             wav_file.close()
 
         return wav_buffer
+    
+    def listen_for_wake_word_with_interrupt(self, interrupt_event):
+        """Listen for wake word and set interrupt_event when detected"""
+        try:
+            self.recorder.start()
+
+            while not interrupt_event.is_set():
+                frame = self.recorder.read()
+                pcm = np.array(frame, dtype=np.int16)
+                keyword_index = self.porcupine.process(pcm)
+                if keyword_index >= 0:
+                    logger.debug("Wake word detected during playback")
+                    interrupt_event.set()
+                    break
+        finally:
+            self.recorder.stop()
