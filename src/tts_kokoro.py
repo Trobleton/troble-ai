@@ -15,7 +15,7 @@ from kokoro import KPipeline
 
 logger = logging.getLogger("speech_to_speech.tts")
 
-class TTS:
+class TTSKokoro:
     def __init__(self):
         torch.backends.cudnn.benchmark = False
         torch.backends.cuda.matmul.allow_tf32 = True

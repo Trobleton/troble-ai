@@ -10,7 +10,8 @@ setup_logging()
 from src.recorder import Recorder
 from src.stt import STT
 from src.llm_wrapper import LLMWrapper
-from src.tts import TTS
+from src.tts_kokoro import TTSKokoro
+from src.tts_orpheus import TTSOrpheus
 from src.utils import save_wav_file, play_wav_file, play_wav_file_interruptible
 from src.osc import VRChatOSC
 from config import *
@@ -53,7 +54,14 @@ def main():
         api=os.getenv("OPENAI_API"),
         api_key=os.getenv("OPENAI_API_KEY")
     )
-    tts = TTS()
+    
+    if TTS_CHOICE == "kokoro":
+        tts = TTSKokoro()
+    elif TTS_CHOICE == "orpheus":
+        tts = TTSOrpheus(
+            api=os.getenv("OPENAI_API"),
+            api_key=os.getenv("OPENAI_API_KEY"),
+        )
 
     vrchat_osc = VRChatOSC()
     conversation_mode = False  # Set to True to keep listening after response

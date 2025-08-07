@@ -1,13 +1,14 @@
 # GLOBAL PARAMS
 DEVICE = "cuda" # either 'cuda' or 'cpu'
-AUDIO_IN_DEVICE = 5
-AUDIO_OUT_DEVICE = 4
+AUDIO_IN_DEVICE = 6
+AUDIO_OUT_DEVICE = 3
 
-# currently we want to use AI for output and Wave Link Monitor for input
+# VR: AI for output, Wave Link Monitor for input
+# DESKTOP: AI for output, MicrophoneFX for input or ... for Discord
 
 # Voice Recorder Parameters
 WAKE_KEYWORD = 'trouble'
-SILENCE_THRESHOLD = 5.0 # seconds of silence to stop recording
+SILENCE_THRESHOLD = 3.0 # seconds of silence to stop recording
 VOICE_PROBABILITY = 0.2 # probability threshold of what is considered silence
 
 # LLM Params
@@ -28,6 +29,12 @@ If someone says goodbye, after you say goodbye back, you do not need to continue
 """
 
 ## TTS Parameters
-TTS_CHOICE = 'kokoro' # ["coqui", "orpheus", "kokoro"]
+TTS_CHOICE = 'orpheus' # ["coqui", "orpheus", "kokoro"]
+ORPHEUS_TTS_MODEL = "orpheus-3b-0.1-ft"
+ORPHEUS_TTS_VOICE = "tara" # ["tara", "leah", "jess", "leo", "dan", "mia", "zac", "zoe"]
+ORPHEUS_TTS_TEMPERATURE = 0.5
+ORPHEUS_TTS_TOP_P = 0.9
+ORPHEUS_TTS_MAX_TOKENS = 2048
+ORPHEUS_TTS_REPEAT_PENALTY = 1.1
 KOKORO_TTS_VOICE = "af_bella" # ["af_heart", "af_bella", "af_nicole", "am_fenrir", "am_michael", "am_puck", "bf_emma", "bf_isabella", "bm_george", "bm_fable", "bm_daniel"]
 KOKORO_TTS_LANG = "a" # "a" for american, "b" for british (must match voice)
