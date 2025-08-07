@@ -67,6 +67,7 @@ def main():
             logger.debug("Processing pending command from brief listening period")
         else:
             if not conversation_mode:
+                vrchat_osc.clear_message()
                 logger.debug("Listening for wake word...")
                 audio_recorder.record_wake_word()
                 silence_threshold = SILENCE_THRESHOLD  # Use your normal threshold
