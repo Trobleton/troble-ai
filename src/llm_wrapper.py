@@ -133,7 +133,6 @@ class LLMWrapper:
             messages=prompt_messages,
             temperature=TEMPERATURE,
             top_p=TOP_P,
-            # max_tokens=150,
         ).choices[0]
         
         response_text = response.message.content
