@@ -26,12 +26,35 @@ class RAGLangchain:
 
 
   def add_document(self, document):
+    # Validate document content
+    if not document or "content" not in document:
+      self.logger.warning("Document is missing or has no 'content' field")
+      return
+    
+    content = document["content"]
+    if not content or not content.strip():
+      self.logger.warning("Document content is empty or whitespace only")
+      return
+    
+    # Validate source field
+    source = document.get("source", "unknown")
+    
     documents = []
+    chunks = self.splitter.split_text(content)
     
-    for chunk in self.splitter.split_text(document["content"]):
-      documents.append(Document(chunk, metadata={"source": document["source"]}))
+    for chunk in chunks:
+      # Only add non-empty chunks
+      if chunk and chunk.strip():
+        documents.append(Document(chunk.strip(), metadata={"source": source}))
     
-    self.db.add_documents(documents)
+    if documents:
+      try:
+        self.db.add_documents(documents)
+        self.logger.debug(f"Added {len(documents)} chunks from source: {source}")
+      except Exception as e:
+        self.logger.error(f"Failed to add documents to RAG: {e}")
+    else:
+      self.logger.warning(f"No valid chunks generated from document: {source}")
 
 
   def query(self, prompt):

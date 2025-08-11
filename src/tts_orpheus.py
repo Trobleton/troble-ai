@@ -73,24 +73,7 @@ class TTSOrpheus:
   def _convert_to_audio(self, multiframe, count):
     """Convert token frames to audio."""
     # Import here to avoid circular imports
-    import sys
-    import os
-    
-    # Ensure the src directory is in the Python path
-    src_dir = os.path.dirname(os.path.abspath(__file__))
-    if src_dir not in sys.path:
-      sys.path.insert(0, src_dir)
-    
-    try:
-      from tts_orpheus_decoder import convert_to_audio as orpheus_convert_to_audio
-    except ModuleNotFoundError:
-      # Try with explicit path
-      import importlib.util
-      decoder_path = os.path.join(src_dir, 'tts_orpheus_decoder.py')
-      spec = importlib.util.spec_from_file_location("tts_orpheus_decoder", decoder_path)
-      decoder_module = importlib.util.module_from_spec(spec)
-      spec.loader.exec_module(decoder_module)
-      orpheus_convert_to_audio = decoder_module.convert_to_audio
+    from src.tts_orpheus_decoder import convert_to_audio as orpheus_convert_to_audio
 
     return orpheus_convert_to_audio(self.snac_model, self.snac_device, multiframe, count)
 
@@ -99,43 +82,18 @@ class TTSOrpheus:
     """Asynchronous token decoder that converts token stream to audio stream."""
     buffer = []
     count = 0
-    processed_count = 0
-    
     async for token_text in token_gen:
       token = self._turn_token_into_id(token_text, count)
-      if token is not None:
+      if token is not None and token > 0:
         buffer.append(token)
         count += 1
-        # Log first few tokens for debugging
-        if count <= 10:
-          self.logger.debug(f"Token {count}: {token} (from: {token_text.strip()})")
         
-        # Convert to audio when we have enough tokens (minimum 7 for one frame)
-        if count % 7 == 0 and count >= 7:
-          # Process tokens we haven't processed yet, up to 28 tokens at a time
-          tokens_to_process = min(28, count - processed_count)
-          tokens_to_process = (tokens_to_process // 7) * 7  # Round down to multiple of 7
-          
-          if tokens_to_process >= 7:
-            buffer_to_proc = buffer[processed_count:processed_count + tokens_to_process]
-            self.logger.debug(f"Processing tokens {processed_count + 1}-{processed_count + tokens_to_process}: {buffer_to_proc[:7]}")
-            audio_samples = self._convert_to_audio(buffer_to_proc, processed_count + tokens_to_process)
-            if audio_samples is not None:
-              processed_count += tokens_to_process
-              self.logger.debug(f"Successfully generated audio for tokens {processed_count - tokens_to_process + 1}-{processed_count}")
-              yield audio_samples
-            else:
-              self.logger.warning(f"Failed to generate audio for tokens {processed_count + 1}-{processed_count + tokens_to_process}")
-    
-    # Process any remaining unprocessed tokens at the end of the stream
-    if count > processed_count:
-      remaining_tokens = count - processed_count
-      if remaining_tokens >= 7:
-        tokens_to_process = (remaining_tokens // 7) * 7  # Round down to multiple of 7
-        buffer_to_proc = buffer[processed_count:processed_count + tokens_to_process]
-        audio_samples = self._convert_to_audio(buffer_to_proc, count)
-        if audio_samples is not None:
-          yield audio_samples
+        # Convert to audio when we have enough tokens
+        if count % 7 == 0 and count > 27:
+          buffer_to_proc = buffer[-28:]
+          audio_samples = self._convert_to_audio(buffer_to_proc, count)
+          if audio_samples is not None:
+            yield audio_samples
 
   def _tokens_decoder_sync(self, syn_token_gen, wav_file):
     """Synchronous wrapper for the asynchronous token decoder."""
@@ -228,3 +186,4 @@ class TTSOrpheus:
       wav_file.close()
       
     return wav_buffer, audio_duration
+  

@@ -96,8 +96,14 @@ class LLMWrapper():
 
   def _filter_think(self, text):
     marker = "</think>"
-    index = text.find(marker) + len(marker)
-    filtered_text = text[index:].replace("\n", "")
+    index = text.find(marker)
+    
+    if index != -1:
+      # Found the marker, return text after it
+      filtered_text = text[index + len(marker):].replace("\n", "")
+    else:
+      # No marker found, return original text
+      filtered_text = text.replace("\n", "")
     
     return filtered_text
 
@@ -132,6 +138,17 @@ class LLMWrapper():
     filtered_text = emoji_pattern.sub(r'', text)
     
     return filtered_text
+  
+  def _filter_expressions(self, text):
+    """Remove TTS expressions like <smile>, <laugh>, etc."""
+    # Pattern to match expressions in angle brackets
+    expression_pattern = re.compile(r'<[^>]*>', re.IGNORECASE)
+    filtered_text = expression_pattern.sub('', text)
+    
+    # Clean up any double spaces that might result from removing expressions
+    filtered_text = re.sub(r'\s+', ' ', filtered_text).strip()
+    
+    return filtered_text
 
   def decide_websearch(self, text):
     prompt_messages = [
@@ -162,6 +179,10 @@ class LLMWrapper():
     response_text = self._filter_think(response_text)
     response_text = self._filter_emoji(response_text)
     response_text = self._filter_markdown(response_text)
+    
+    # Remove expressions like <smile>, <laugh> when using Kokoro TTS
+    if TTS_CHOICE == "kokoro":
+      response_text = self._filter_expressions(response_text)
     
     # Handle cases where the LLM doesn't follow the expected format
     if "+-+" in response_text:
@@ -242,6 +263,10 @@ class LLMWrapper():
     response_text = self._filter_think(response_text)
     response_text = self._filter_emoji(response_text)
     response_text = self._filter_markdown(response_text)
+    
+    # Remove expressions like <smile>, <laugh> when using Kokoro TTS
+    if TTS_CHOICE == "kokoro":
+      response_text = self._filter_expressions(response_text)
     
     response_length = len(response_text.split(" "))
     

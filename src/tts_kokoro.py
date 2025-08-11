@@ -3,6 +3,12 @@ import logging
 import io
 import os
 import numpy as np
+import warnings
+
+# Suppress common PyTorch warnings
+warnings.filterwarnings("ignore", message="dropout option adds dropout after all but last")
+warnings.filterwarnings("ignore", message="torch.nn.utils.weight_norm is deprecated")
+
 import torch
 from config import *
 from kokoro import KPipeline
