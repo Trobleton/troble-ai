@@ -1,7 +1,7 @@
 # GLOBAL PARAMS
 DEVICE = "cuda" # either 'cuda' or 'cpu'
 AUDIO_IN_DEVICE = 0
-AUDIO_OUT_DEVICE = 4
+AUDIO_OUT_DEVICE = 3
 
 # VR: AI for output, Wave Link Monitor for input
 # DESKTOP: AI for output, MicrophoneFX for input or ... for Discord

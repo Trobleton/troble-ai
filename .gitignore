@@ -7,3 +7,4 @@ data/*
 .env
 chat_history.json
 output.wav
+command.wav

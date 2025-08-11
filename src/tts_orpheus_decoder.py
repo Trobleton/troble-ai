@@ -104,7 +104,6 @@ async def tokens_decoder(token_gen):
                     if audio_samples is not None:
                         yield audio_samples
 
-
 # ------------------ Synchronous Tokens Decoder Wrapper ------------------ #
 def tokens_decoder_sync(syn_token_gen):
 
