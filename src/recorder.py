@@ -43,6 +43,7 @@ class Recorder:
         silence_threshold_sec = silence_threshold
         silence_frames_required = int(silence_threshold_sec / frame_duration)
         silence_frame_count = 0
+        total_frame_count = 0
 
         try:
             self.recorder.start()
@@ -50,6 +51,7 @@ class Recorder:
             while True:
                 frame = self.recorder.read()
                 pcm = np.array(frame, dtype=np.int16)
+                total_frame_count += pcm.size
                 
                 wav_file.writeframes(struct.pack("h" * len(frame), *frame))
 
@@ -67,7 +69,9 @@ class Recorder:
             self.recorder.stop()
             wav_file.close()
 
-        return wav_buffer
+        duration_sec = total_frame_count / self.recorder.sample_rate
+
+        return wav_buffer, duration_sec
     
     def listen_for_wake_word_with_interrupt(self, interrupt_event):
         """Listen for wake word and set interrupt_event when detected"""

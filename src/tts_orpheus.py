@@ -5,6 +5,7 @@ import io
 import threading
 import queue
 import asyncio
+import os
 from snac import SNAC
 from openai import OpenAI
 from config import *
@@ -12,9 +13,9 @@ from config import *
 logger = logging.getLogger("speech_to_speech.tts_orpheus")
 
 class TTSOrpheus:
-  def __init__(self, api, api_key):
-    self.api = api
-    self.api_key = api_key
+  def __init__(self):
+    self.api = os.getenv("OPENAI_API")
+    self.api_key = os.getenv("OPENAI_API_KEY")
     self.model = ORPHEUS_TTS_MODEL
     self.voice = ORPHEUS_TTS_VOICE
     self.snac_device = DEVICE
