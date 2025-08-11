@@ -19,7 +19,7 @@ class LLMWrapper():
     self.global_chat_history = []
     self.current_chat_history = []
     self.current_chat_history_length = 0
-    project_root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    project_root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     self.chat_history_path = os.path.join(project_root_dir, "data", "chat_history.json")
     self.max_tokens = int(MAX_TOKENS * 0.75)
     
@@ -58,7 +58,6 @@ class LLMWrapper():
     
     self._load_convo_history()
     
-    
   def _load_convo_history(self):
     self.logger.debug("Loading conversation history")
 
@@ -81,7 +80,6 @@ class LLMWrapper():
       self.current_chat_history_length += cur_message["length"]
       index -= 1
 
-
   def _write_chat_history(self):
     self.logger.debug(f"Saving conversation history")
 
@@ -92,7 +90,6 @@ class LLMWrapper():
       chat_history_file
     )
     chat_history_file.close()
-
 
   def _filter_think(self, text):
     marker = "</think>"
@@ -205,7 +202,6 @@ class LLMWrapper():
         topic = "none"
 
     return require_search.lower(), topic.lower()
-
 
   def send_to_llm(self, text, context = ""):
     if not ENABLE_THINK:

@@ -46,10 +46,6 @@ class TTSKokoro:
       chunk_count = 0
       for _, _,audio in generator:
         chunk_count += 1
-        if chunk_count <= 3:  # Log first few chunks
-          self.logger.debug(f"Kokoro chunk {chunk_count}: audio shape={audio.shape if hasattr(audio, 'shape') else len(audio) if audio is not None else 'None'}")
-          if chunk_count == 1:
-            self.logger.debug(f"First chunk content preview: {audio[:10] if hasattr(audio, '__len__') and len(audio) > 10 else audio}")
         if self.interrupt_count.value > 0:
           break
 

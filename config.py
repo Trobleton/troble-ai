@@ -1,7 +1,7 @@
 # GLOBAL PARAMS
 DEVICE = "cuda" # either 'cuda' or 'cpu'
-AUDIO_IN_DEVICE = 0
-AUDIO_OUT_DEVICE = 3
+AUDIO_IN_DEVICE = 8
+AUDIO_OUT_DEVICE = 5
 
 # VR: AI for output, Wave Link Monitor for input
 # DESKTOP: AI for output, MicrophoneFX for input or ... for Discord
@@ -53,7 +53,15 @@ COQUI_TTS_REFERENCE_WAV = "xtts_reference.wav" # must be wav file
 COQUI_TTS_SPEAKER = "p234"
 
 ## Websearch Parameters
+ENABLE_WEBSEARCH = True  # Set to False to disable web search
 RAG_CONFIDENCE_THRESHOLD = 0.3
 
 ## Interruption Parameters
 ENABLE_INTERRUPTION = False  # Enable wake word interruption during playback
+
+## Conversation Management
+GOODBYE_PHRASES = [
+    "goodbye", "bye", "see you later", "talk to you later", "bye bye", 
+    "good night", "goodnight", "catch you later", "see ya", "peace out",
+    "until next time", "farewell", "take care", "later"
+]

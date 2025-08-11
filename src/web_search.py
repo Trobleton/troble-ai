@@ -78,10 +78,14 @@ class WebSearcher:
     title = path_components[path_components.index("wiki") + 1]
     title = unquote(title)  # Decode %20 etc.
     
-    fandom.set_wiki(fandom_page)
-    page = fandom.page(title)
-    
-    return page.plain_text.replace("\n", "")
+    try:
+      fandom.set_wiki(fandom_page)
+      page = fandom.page(title)
+      return page.plain_text.replace("\n", "")
+    except (AttributeError, Exception) as e:
+      self.logger.warning(f"Failed to fetch Fandom content for {website}: {e}")
+      # Fallback to regular web scraping
+      return self._fetch_other_content(website)
 
 
   def _fetch_other_content(self, website):

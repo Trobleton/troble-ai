@@ -93,10 +93,7 @@ def play_wav_file(wav_bytes, logger, interrupt_count : SynchronizedClass | None 
   time.sleep(0.05)  # 50ms delay
 
   print("Playing audio...")
-  logger.debug(f"Audio split into {len(pcm_list)} chunks, first chunk size: {len(pcm_list[0]) if pcm_list else 0}")
   for i, pcm_sublist in enumerate(pcm_list):
-      if i < 2:  # Log first two chunks
-          logger.debug(f"Processing audio chunk {i+1}/{len(pcm_list)}, size: {len(pcm_sublist)}")
       sublist_length = len(pcm_sublist)
       total_written_length = 0
       while total_written_length < sublist_length:

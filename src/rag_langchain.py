@@ -65,12 +65,16 @@ class RAGLangchain:
       k = 5
     )
     
-    
+    # Normalize scores to 0-1 range for cosine similarity
+    # Cosine similarity can be > 1, so we clamp and normalize
     for document, score in search_results:
+      # Clamp score to reasonable range and normalize to 0-1
+      normalized_score = min(max(score, 0.0), 2.0) / 2.0
+      
       results.append({
         "content": document.page_content,
         "source": document.metadata["source"],
-        "score": score
+        "score": normalized_score
       })
 
     return results
