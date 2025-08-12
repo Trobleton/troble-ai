@@ -18,3 +18,6 @@ class VRChatOSC:
     def clear_message(self):
         # Clear the chatbox message
         self.client.send_message("/chatbox/input", ["", True, False])
+
+    def pending_message(self, text):
+        self.client.send_message("/chatbox/typing", True)
