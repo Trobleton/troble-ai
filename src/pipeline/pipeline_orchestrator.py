@@ -2,6 +2,7 @@ from multiprocessing import Process, Queue, Event, Value
 from multiprocessing.synchronize import Event as EventClass
 from multiprocessing.sharedctypes import Synchronized as SynchronizedClass
 from multiprocessing.queues import Queue as QueueClass
+from queue import Empty
 
 from src.logging_config import setup_worker_logging, get_logger
 from src.pipeline.voice_input_module import VoiceInputModule
@@ -9,17 +10,17 @@ from src.pipeline.intelligence_module import IntelligenceModule
 from src.pipeline.audio_output_module import AudioOutputModule
 
 
-def voice_worker_func(interrupt_count, voice_setup_event, pipeline_setup_event, command_queue, log_queue):
-    voice_module = VoiceInputModule(interrupt_count, log_queue)
+def voice_worker_func(interrupt_count, playback_active, voice_setup_event, pipeline_setup_event, command_queue, log_queue):
+    voice_module = VoiceInputModule(interrupt_count, playback_active, log_queue)
     voice_module.run_loop(voice_setup_event, pipeline_setup_event, command_queue)
 
 
-def pipeline_worker_func(interrupt_count, voice_setup_event, pipeline_setup_event, command_queue, log_queue):
+def pipeline_worker_func(interrupt_count, playback_active, voice_setup_event, pipeline_setup_event, command_queue, log_queue):
     setup_worker_logging(log_queue)
     logger = get_logger("pipeline.worker")
     
-    intelligence_module = IntelligenceModule(interrupt_count, log_queue)
-    audio_output_module = AudioOutputModule(interrupt_count, log_queue)
+    intelligence_module = IntelligenceModule(interrupt_count, playback_active, log_queue)
+    audio_output_module = AudioOutputModule(interrupt_count, playback_active, log_queue)
     
     pipeline_setup_event.set()
     logger.debug("Waiting for voice recording to setup")
@@ -39,19 +40,34 @@ def pipeline_worker_func(interrupt_count, voice_setup_event, pipeline_setup_even
                 response, interrupted = intelligence_module.process_query(text, continuation, is_goodbye)
                 
                 if not interrupted and response:
+                    playback_active.value = 1  # Set flag to disable listening during playback
                     interrupted = audio_output_module.synthesize_and_play(
                         response, save_file="output.wav"
                     )
+                    playback_active.value = 0  # Clear flag when playback completes
                 
                 if not interrupted:
                     intelligence_module.llm.interrupt_context.clear()
                 
                 # Always consume the finish marker to maintain queue sync
-                finish_work = command_queue.get()  # Remove finish marker
-                
-                # If processing was interrupted, still need to decrement interrupt count
-                if interrupted and finish_work["marker"] == "finish":
-                    interrupt_count.value -= 1
+                try:
+                    finish_work = command_queue.get(timeout=0.1)  # Remove finish marker with timeout
+                    
+                    # Verify this is actually the finish marker for the same text
+                    if (finish_work["marker"] == "finish" and 
+                        finish_work["text"] == text):
+                        # If processing was interrupted, still need to decrement interrupt count
+                        if interrupted:
+                            interrupt_count.value -= 1
+                    else:
+                        logger.warning(f"Queue synchronization issue: expected finish marker for '{text}', got {finish_work}")
+                        # Put the item back if it's not the expected finish marker
+                        command_queue.put(finish_work)
+                        
+                except Empty:
+                    logger.error("Timeout waiting for finish marker - possible synchronization issue")
+                except Exception as e:
+                    logger.error(f"Error getting finish marker from queue: {e}")
                     
             elif marker == "finish":
                 # This should only happen if we somehow get a finish marker without start
@@ -67,6 +83,7 @@ class PipelineOrchestrator:
         self.command_queue = Queue()
         self.interrupt_event = Event()
         self.interrupt_count = Value("i", 0)
+        self.playback_active = Value("i", 0)  # Flag to disable listening during playback
         self.voice_setup_event = Event()
         self.pipeline_setup_event = Event()
         
@@ -78,11 +95,11 @@ class PipelineOrchestrator:
         
         self.voice_worker_process = Process(
             target=voice_worker_func, 
-            args=(self.interrupt_count, self.voice_setup_event, self.pipeline_setup_event, self.command_queue, self.log_queue)
+            args=(self.interrupt_count, self.playback_active, self.voice_setup_event, self.pipeline_setup_event, self.command_queue, self.log_queue)
         )
         self.pipeline_worker_process = Process(
             target=pipeline_worker_func, 
-            args=(self.interrupt_count, self.voice_setup_event, self.pipeline_setup_event, self.command_queue, self.log_queue)
+            args=(self.interrupt_count, self.playback_active, self.voice_setup_event, self.pipeline_setup_event, self.command_queue, self.log_queue)
         )
         
         self.voice_worker_process.start()

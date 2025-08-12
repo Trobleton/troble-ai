@@ -237,6 +237,9 @@ class LLMWrapper():
     
     prompt_messages[-1]["content"] =  prompt_modification + prompt_messages[-1]["content"]
     
+    # Log the complete prompt being sent to LLM
+    self.logger.info(f"PROMPT: {prompt_messages[-1]['content']}")
+    
     response_text = ""
     
     stream = self.client.chat.completions.create(
@@ -263,6 +266,9 @@ class LLMWrapper():
     # Remove expressions like <smile>, <laugh> when using Kokoro TTS
     if TTS_CHOICE == "kokoro":
       response_text = self._filter_expressions(response_text)
+    
+    # Log the generated response
+    self.logger.info(f"RESPONSE: {response_text}")
     
     response_length = len(response_text.split(" "))
     

@@ -12,10 +12,11 @@ from src.utils import save_wav_file
 
 
 class VoiceInputModule:
-    def __init__(self, interrupt_count: SynchronizedClass, log_queue):
+    def __init__(self, interrupt_count: SynchronizedClass, playback_active: SynchronizedClass, log_queue):
         setup_worker_logging(log_queue)
         self.logger = get_logger("pipeline.voice_input")
         self.interrupt_count = interrupt_count
+        self.playback_active = playback_active
         
         self.audio_recorder = Recorder()
         self.whisper = STTWhisper(vad_active=True, device=DEVICE)
@@ -90,6 +91,11 @@ class VoiceInputModule:
         pipeline_setup_event.wait()
         
         while True:
+            # Skip all listening when playback is active
+            if self.playback_active.value > 0:
+                time.sleep(0.1)  # Brief sleep to prevent busy loop
+                continue
+                
             if self.should_reset_wakeword():
                 self.logger.warning("wakeword reset")
                 self.ask_wakeword = True

@@ -1,20 +1,20 @@
 # GLOBAL PARAMS
 DEVICE = "cuda" # either 'cuda' or 'cpu'
-AUDIO_IN_DEVICE = 8
-AUDIO_OUT_DEVICE = 5
+AUDIO_IN_DEVICE = 6
+AUDIO_OUT_DEVICE = 3
 
 # VR: AI for output, Wave Link Monitor for input
 # DESKTOP: AI for output, MicrophoneFX for input or ... for Discord
 
 # Voice Recorder Parameters
 WAKE_KEYWORD = 'trouble'
-SILENCE_THRESHOLD = 1.0 # seconds of silence to stop recording
+SILENCE_THRESHOLD = 2.0 # seconds of silence to stop recording
 VOICE_PROBABILITY = 0.35 # probability threshold of what is considered silence
-VOICE_THRESHOLD = 0.25 # determins how much total speech (not continuous) is required for a valid command
+VOICE_THRESHOLD = 0.5 # determins how much total speech (not continuous) is required for a valid command
 
 # Natural Conversation Parameters
 WAKEWORD_RESET_TIME = 45 # No wakeword needed unless no follow up command in WAKEWORD_RESET_TIME seconds 0 = disable natural conversation
-CONTINUATION_THRESHOLD = 0.25 # Number of seconds in which another command is considered an extension to previous command. Only matters when WAKEWORD_RESET_TIME > 0
+CONTINUATION_THRESHOLD = 0.5 # Number of seconds in which another command is considered an extension to previous command. Only matters when WAKEWORD_RESET_TIME > 0
 
 # LLM Params
 MAX_TOKENS = 3000 # depends on the model, enter lower value than max recommended
@@ -55,9 +55,6 @@ COQUI_TTS_SPEAKER = "p234"
 ## Websearch Parameters
 ENABLE_WEBSEARCH = True  # Set to False to disable web search
 RAG_CONFIDENCE_THRESHOLD = 0.3
-
-## Interruption Parameters
-ENABLE_INTERRUPTION = False  # Enable wake word interruption during playback
 
 ## Conversation Management
 GOODBYE_PHRASES = [

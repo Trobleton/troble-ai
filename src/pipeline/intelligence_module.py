@@ -1,4 +1,6 @@
 import threading
+import time
+import re
 from multiprocessing.sharedctypes import Synchronized as SynchronizedClass
 
 from config import TTS_CHOICE, RAG_CONFIDENCE_THRESHOLD, ENABLE_WEBSEARCH
@@ -12,14 +14,19 @@ from src.utils import play_wav_file
 
 
 class IntelligenceModule:
-    def __init__(self, interrupt_count: SynchronizedClass, log_queue):
+    def __init__(self, interrupt_count: SynchronizedClass, playback_active: SynchronizedClass, log_queue):
         setup_worker_logging(log_queue)
         self.logger = get_logger("pipeline.intelligence")
         self.interrupt_count = interrupt_count
+        self.playback_active = playback_active
         
         self.llm = LLMWrapper(interrupt_count=interrupt_count)
         self.websearch = WebSearcher(interrupt_count=interrupt_count)
         self.rag = RAGLangchain(interrupt_count=interrupt_count)
+        
+        # Track last processed query to prevent loops
+        self.last_processed_query = ""
+        self.last_processed_time = 0
         
         if TTS_CHOICE == "orpheus":
             self.tts = TTSOrpheus(interrupt_count=interrupt_count)
@@ -31,14 +38,78 @@ class IntelligenceModule:
         self.llm.interrupt_context.append(text)
     
     def play_search_notification(self, topic: str):
-        def searching_speech_worker():
-            output_buffer, output_duration = self.tts.synthesize(f"Searching the web for {topic}")
-            output_buffer.seek(0)
-            play_wav_file(output_buffer, self.logger, self.interrupt_count)
+        self.playback_active.value = 1  # Disable listening during search notification
         
-        speech_thread = threading.Thread(target=searching_speech_worker)
-        speech_thread.start()
-        return speech_thread
+        output_buffer, output_duration = self.tts.synthesize(f"Searching the web for {topic}")
+        if self.interrupt_count.value > 0:
+            self.playback_active.value = 0
+            return
+            
+        output_buffer.seek(0)
+        play_wav_file(output_buffer, self.logger, self.interrupt_count)
+        
+        self.playback_active.value = 0  # Re-enable listening after notification
+    
+    def _is_meaningful_prompt(self, text: str) -> bool:
+        """Check if a prompt is meaningful enough to warrant a response."""
+        if not text:
+            return False
+        
+        # Clean the text for analysis
+        cleaned_text = text.lower().strip()
+        words = cleaned_text.split()
+        
+        # Always respond if longer than 2 words
+        if len(words) > 2:
+            return True
+        
+        # Filter out common meaningless short phrases
+        meaningless_patterns = [
+            # Single characters or sounds
+            r'^[a-z]$',  # Single letters
+            r'^(uh|um|hmm|ah|oh|eh)$',  # Filler sounds
+            r'^(huh|what|hey|yo)$',  # Short exclamations that need context
+            
+            # Very short incomplete phrases
+            r'^(the|and|or|but|if|so|to|a|an|is|are|was|were|be)$',  # Articles/conjunctions alone
+            r'^(yes|no|ok|okay)$',  # Simple affirmations without context
+            r'^(hi|hello)$',  # Greetings without questions
+            
+            # Common transcription errors
+            r'^\.$',  # Just punctuation
+            r'^,$',
+            r'^\?$',
+            r'^!$',
+        ]
+        
+        for pattern in meaningless_patterns:
+            if re.match(pattern, cleaned_text):
+                return False
+        
+        # Check for meaningful 2-word phrases
+        if len(words) == 2:
+            meaningful_2_word_patterns = [
+                r'(what|how|when|where|why|who|can|will|should|could|would|do|does|did|is|are|was|were)\s+\w+',
+                r'\w+\s+(help|please|thanks|now|today|tomorrow|here|there)',
+                r'(tell|show|give|find|search|play|stop|start|open|close)\s+\w+',
+            ]
+            
+            for pattern in meaningful_2_word_patterns:
+                if re.match(pattern, cleaned_text):
+                    return True
+            
+            # If it's 2 words but doesn't match meaningful patterns, likely not meaningful
+            return False
+        
+        # Single words that are meaningful
+        meaningful_single_words = [
+            'help', 'stop', 'pause', 'resume', 'continue', 'restart', 'repeat',
+            'thanks', 'thank', 'please', 'sorry', 'excuse',
+            'weather', 'time', 'date', 'news', 'music', 
+            'search', 'find', 'lookup', 'google'
+        ]
+        
+        return cleaned_text in meaningful_single_words
     
     def query_rag(self, text: str) -> tuple[list, bool]:
         self.logger.debug("Querying RAG")
@@ -51,7 +122,7 @@ class IntelligenceModule:
         return query_results, max(query_result_scores) >= RAG_CONFIDENCE_THRESHOLD
     
     def perform_websearch(self, text: str, topic: str) -> tuple[list, bool]:
-        speech_thread = self.play_search_notification(topic)
+        self.play_search_notification(topic)
         
         websites = self.websearch.ddg_search(text)
         if self.interrupt_count.value > 0:
@@ -75,7 +146,6 @@ class IntelligenceModule:
         if self.interrupt_count.value > 0:
             return [], True
         
-        speech_thread.join()
         return query_results, False
     
     def decide_websearch_needed(self, text: str) -> tuple[bool, str, bool]:
@@ -99,6 +169,24 @@ class IntelligenceModule:
         return response, False
     
     def process_query(self, text: str, continuation: bool, is_goodbye: bool = False) -> tuple[str, bool]:
+        current_time = time.time()
+        
+        # Prevent processing duplicate queries within 2 seconds
+        if (text.strip().lower() == self.last_processed_query.strip().lower() and 
+            current_time - self.last_processed_time < 2.0 and
+            not continuation):
+            self.logger.warning(f"Skipping duplicate query: '{text}'")
+            return "", False
+        
+        # Update tracking variables
+        self.last_processed_query = text
+        self.last_processed_time = current_time
+        
+        # Filter out meaningless short prompts
+        if not self._is_meaningful_prompt(text.strip()) and not continuation and not is_goodbye:
+            self.logger.info(f"Skipping meaningless short prompt: '{text}'")
+            return "", False
+        
         if continuation:
             self.llm.interrupt_context.pop()
         

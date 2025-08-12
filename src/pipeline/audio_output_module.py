@@ -9,10 +9,11 @@ from src.utils import save_wav_file, play_wav_file
 
 
 class AudioOutputModule:
-    def __init__(self, interrupt_count: SynchronizedClass, log_queue):
+    def __init__(self, interrupt_count: SynchronizedClass, playback_active: SynchronizedClass, log_queue):
         setup_worker_logging(log_queue)
         self.logger = get_logger("pipeline.audio_output")
         self.interrupt_count = interrupt_count
+        self.playback_active = playback_active
         
         if TTS_CHOICE == "orpheus":
             self.tts = TTSOrpheus(interrupt_count=interrupt_count)
