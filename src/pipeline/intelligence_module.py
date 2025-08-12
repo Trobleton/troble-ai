@@ -1,6 +1,7 @@
 import threading
 import time
 import re
+import random
 from multiprocessing.sharedctypes import Synchronized as SynchronizedClass
 
 from config import TTS_CHOICE, RAG_CONFIDENCE_THRESHOLD, ENABLE_WEBSEARCH
@@ -11,7 +12,7 @@ from src.web_search import WebSearcher
 from src.tts_orpheus import TTSOrpheus
 from src.tts_kokoro import TTSKokoro
 from src.utils import play_wav_file
-
+from src.osc import VRChatOSC
 
 class IntelligenceModule:
     def __init__(self, interrupt_count: SynchronizedClass, playback_active: SynchronizedClass, log_queue):
@@ -19,6 +20,7 @@ class IntelligenceModule:
         self.logger = get_logger("pipeline.intelligence")
         self.interrupt_count = interrupt_count
         self.playback_active = playback_active
+        self.osc = VRChatOSC()
         
         self.llm = LLMWrapper(interrupt_count=interrupt_count)
         self.websearch = WebSearcher(interrupt_count=interrupt_count)
@@ -35,7 +37,9 @@ class IntelligenceModule:
     
     def interrupt_actions(self, text: str, info: str):
         self.logger.warning(f"Pipeline Interrupted: {info}")
-        self.llm.interrupt_context.append(text)
+        # Only add to interrupt context if not already there to prevent duplicates
+        if text not in self.llm.interrupt_context:
+            self.llm.interrupt_context.append(text)
     
     def play_search_notification(self, topic: str):
         self.playback_active.value = 1  # Disable listening during search notification
@@ -124,7 +128,7 @@ class IntelligenceModule:
     def perform_websearch(self, text: str, topic: str) -> tuple[list, bool]:
         self.play_search_notification(topic)
         
-        websites = self.websearch.ddg_search(text)
+        websites = self.websearch.ddg_search(topic)
         if self.interrupt_count.value > 0:
             return [], True
         
@@ -152,7 +156,8 @@ class IntelligenceModule:
         self.logger.debug("Not enough confident info in RAG, decide search")
         decision, topic = self.llm.decide_websearch(text)
         
-        if self.interrupt_count.value > 0:
+        # Check if LLM was interrupted (returns None, None)
+        if decision is None or topic is None or self.interrupt_count.value > 0:
             return False, "", True
         
         self.logger.debug(f"Websearch recommended?: {decision} - {topic}")
@@ -160,9 +165,11 @@ class IntelligenceModule:
     
     def generate_response(self, text: str, context: str) -> tuple[str, bool]:
         self.logger.debug("Sending to LLM")
+        self.osc.send_message("thinking...")
         response = self.llm.send_to_llm(text, context)
         
-        if self.interrupt_count.value > 0:
+        # Check if LLM was interrupted (returns None)
+        if response is None or self.interrupt_count.value > 0:
             return "", True
         
         self.logger.info(response)
@@ -181,6 +188,11 @@ class IntelligenceModule:
         # Update tracking variables
         self.last_processed_query = text
         self.last_processed_time = current_time
+        
+        # Clear interrupt context if it has too many entries (prevent buildup)
+        if len(self.llm.interrupt_context) > 3:
+            self.logger.warning(f"Clearing interrupt context buildup: {len(self.llm.interrupt_context)} entries")
+            self.llm.interrupt_context.clear()
         
         # Filter out meaningless short prompts
         if not self._is_meaningful_prompt(text.strip()) and not continuation and not is_goodbye:
@@ -203,7 +215,6 @@ class IntelligenceModule:
                 "Bye! I'll be listening for 'Trouble' when you're ready to chat.",
                 "Until next time! Remember to say 'Trouble' to wake me up."
             ]
-            import random
             response = random.choice(goodbye_responses)
             return response, False
         
@@ -212,23 +223,34 @@ class IntelligenceModule:
             self.interrupt_actions(text, info="querying RAG")
             return "", True
         
-        if not has_confident_info and ENABLE_WEBSEARCH:
+        # Only use RAG results if they are confident, otherwise search or use no context
+        if has_confident_info:
+            self.logger.debug("Using confident RAG information")
+            context = ""
+            for result in query_results:
+                context += result["content"]
+        elif ENABLE_WEBSEARCH:
             needs_search, topic, interrupted = self.decide_websearch_needed(text)
             if interrupted:
                 self.interrupt_actions(text, info="Decide websearch")
                 return "", True
             
             if needs_search:
-                query_results, interrupted = self.perform_websearch(text, topic)
+                search_results, interrupted = self.perform_websearch(text, topic)
                 if interrupted:
                     self.interrupt_actions(text, info="Performing websearch")
                     return "", True
-        
-        self.logger.debug("Info in RAG exists, no search needed")
-        
-        context = ""
-        for result in query_results:
-            context += result["content"]
+                
+                # Use fresh search results for context
+                context = ""
+                for result in search_results:
+                    context += result["content"]
+            else:
+                # No confident RAG info and no search needed - use no context
+                context = ""
+        else:
+            # Web search disabled and no confident RAG info - use no context
+            context = ""
         
         response, interrupted = self.generate_response(text, context)
         if interrupted:

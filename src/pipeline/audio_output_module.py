@@ -6,6 +6,7 @@ from src.logging_config import setup_worker_logging, get_logger
 from src.tts_orpheus import TTSOrpheus
 from src.tts_kokoro import TTSKokoro
 from src.utils import save_wav_file, play_wav_file
+from src.osc import VRChatOSC
 
 
 class AudioOutputModule:
@@ -14,6 +15,7 @@ class AudioOutputModule:
         self.logger = get_logger("pipeline.audio_output")
         self.interrupt_count = interrupt_count
         self.playback_active = playback_active
+        self.osc = VRChatOSC()
         
         if TTS_CHOICE == "orpheus":
             self.tts = TTSOrpheus(interrupt_count=interrupt_count)
@@ -35,6 +37,7 @@ class AudioOutputModule:
             output_buffer.seek(0)
         
         self.logger.debug("Playing response")
+        self.osc.send_message(text)
         play_wav_file(output_buffer, self.logger, interrupt_count=self.interrupt_count)
         
         if self.interrupt_count.value > 0:

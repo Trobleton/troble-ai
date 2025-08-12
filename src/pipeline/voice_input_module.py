@@ -9,6 +9,7 @@ from src.logging_config import setup_worker_logging, get_logger
 from src.voice_recorder import Recorder
 from src.stt_whisper import STTWhisper
 from src.utils import save_wav_file
+from src.osc import VRChatOSC
 
 
 class VoiceInputModule:
@@ -25,6 +26,7 @@ class VoiceInputModule:
         self.ask_wakeword = True
         self.last_command_time = 0
         self.prev_text = ""
+        self.osc = VRChatOSC()
     
     def should_reset_wakeword(self) -> bool:
         return (time.time() - self.last_command_time) > WAKEWORD_RESET_TIME
@@ -99,6 +101,7 @@ class VoiceInputModule:
             if self.should_reset_wakeword():
                 self.logger.warning("wakeword reset")
                 self.ask_wakeword = True
+                self.osc.clear_message()
             
             if self.ask_wakeword:
                 self.listen_for_wake_word()

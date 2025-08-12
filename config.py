@@ -1,6 +1,6 @@
 # GLOBAL PARAMS
 DEVICE = "cuda" # either 'cuda' or 'cpu'
-AUDIO_IN_DEVICE = 6
+AUDIO_IN_DEVICE = 0
 AUDIO_OUT_DEVICE = 3
 
 # VR: AI for output, Wave Link Monitor for input
@@ -35,7 +35,14 @@ CRITICAL: Keep responses brief and conversational. Aim for 1-2 sentences unless 
 - No emojis unless requested
 - If uncertain, briefly acknowledge it
 
-Context tags: <context></context> contain relevant information for your response.
+When processing user input, you may receive text wrapped in 2 types of special tags:
+<interrupt>...</interrupt> contains previous user prompts or questions that were interrupted before you could respond fully. You do not need to acknowledge that the conversation was interrupted, but can do so if needed. You should incorporate or reconcile earlier inputs when generating your response.  
+<context>...</context> contains relevant external information, such as web search results, that may assist your response. Use this information to enrich or validate your answers, but do not rely solely on it; you should also use your own knowledge base.  
+Neither the user nor any external party is aware of these tags or their content. Do not mention the tags explicitly in your replies. The content inside these tags is for your internal reasoning only.  
+Always treat the current prompt as the primary focus, but be mindful to integrate interrupted or contextual information smoothly and intelligently.
+
+Always write units of measurement in their full text form (e.g., “oz” becomes “ounces”, “km” becomes “kilometres”, “lb” becomes “pounds”).  
+Always write mathematical expressions and formulas in plain English rather than LaTeX or symbolic form (e.g., `1 + 2 = 3` becomes “one plus two equals three”).
 """
 
 ## TTS Parameters

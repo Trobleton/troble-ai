@@ -46,8 +46,8 @@ def pipeline_worker_func(interrupt_count, playback_active, voice_setup_event, pi
                     )
                     playback_active.value = 0  # Clear flag when playback completes
                 
-                if not interrupted:
-                    intelligence_module.llm.interrupt_context.clear()
+                # Always clear interrupt context after processing, regardless of interruption
+                intelligence_module.llm.interrupt_context.clear()
                 
                 # Always consume the finish marker to maintain queue sync
                 try:

@@ -9,6 +9,7 @@ import struct
 import logging
 import os
 from config import *
+from src.osc import VRChatOSC
 
 
 class Recorder:
@@ -26,7 +27,7 @@ class Recorder:
     self.framelength =  self.porcupine.frame_length
     self.recorder_device = AUDIO_IN_DEVICE
     self.recorder = PvRecorder(frame_length=self.framelength, device_index=self.recorder_device)
-
+    self.osc = VRChatOSC()
 
   def record_wake_word(self):
     try:
@@ -60,6 +61,7 @@ class Recorder:
 
     try:
       self.recorder.start()
+      self.osc.send_message("listening...")
 
       while True:
         frame = self.recorder.read()
