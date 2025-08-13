@@ -9,8 +9,7 @@ from src.logging_config import setup_worker_logging, get_logger
 from src.llm_wrapper import LLMWrapper
 from src.rag_langchain import RAGLangchain
 from src.web_search import WebSearcher
-from src.tts_orpheus import TTSOrpheus
-from src.tts_kokoro import TTSKokoro
+from src.tts.kokoro import TTSKokoro
 from src.utils import play_wav_file
 from src.osc import VRChatOSC
 
@@ -30,10 +29,7 @@ class IntelligenceModule:
         self.last_processed_query = ""
         self.last_processed_time = 0
         
-        if TTS_CHOICE == "orpheus":
-            self.tts = TTSOrpheus(interrupt_count=interrupt_count)
-        elif TTS_CHOICE == "kokoro":
-            self.tts = TTSKokoro(interrupt_count=interrupt_count)
+        self.tts = TTSKokoro(interrupt_count=interrupt_count)
     
     def interrupt_actions(self, text: str, info: str):
         self.logger.warning(f"Pipeline Interrupted: {info}")

@@ -24,7 +24,7 @@ class TTSKokoro:
     torch.backends.cudnn.benchmark = False  # prevents unsupported plan attempts
     torch.backends.cuda.matmul.allow_tf32 = True  # small perf boost on Ampere+
     
-    self.logger = logging.getLogger("speech_to_speech.tts_kokoro")
+    self.logger = logging.getLogger("speech_to_speech.tts.kokoro")
     self.interrupt_count = interrupt_count
     
     self.client = KPipeline(lang_code=KOKORO_TTS_LANG, device=DEVICE, repo_id='hexgrad/Kokoro-82M') # lang code a = american, b = british

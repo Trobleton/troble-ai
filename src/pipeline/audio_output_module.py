@@ -3,8 +3,7 @@ from multiprocessing.sharedctypes import Synchronized as SynchronizedClass
 
 from config import TTS_CHOICE
 from src.logging_config import setup_worker_logging, get_logger
-from src.tts_orpheus import TTSOrpheus
-from src.tts_kokoro import TTSKokoro
+from src.tts.kokoro import TTSKokoro
 from src.utils import save_wav_file, play_wav_file
 from src.osc import VRChatOSC
 
@@ -16,11 +15,7 @@ class AudioOutputModule:
         self.interrupt_count = interrupt_count
         self.playback_active = playback_active
         self.osc = VRChatOSC()
-        
-        if TTS_CHOICE == "orpheus":
-            self.tts = TTSOrpheus(interrupt_count=interrupt_count)
-        elif TTS_CHOICE == "kokoro":
-            self.tts = TTSKokoro(interrupt_count=interrupt_count)
+        self.tts = TTSKokoro(interrupt_count=interrupt_count)
     
     def synthesize_and_play(self, text: str, save_file: str = None) -> bool:
         self.logger.debug("Synthesizing speech")

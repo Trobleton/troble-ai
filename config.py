@@ -1,7 +1,7 @@
 # GLOBAL PARAMS
 DEVICE = "cuda" # either 'cuda' or 'cpu'
-AUDIO_IN_DEVICE = 0
-AUDIO_OUT_DEVICE = 3
+AUDIO_IN_DEVICE = 3
+AUDIO_OUT_DEVICE = 13
 
 # VR: AI for output, Wave Link Monitor for input
 # DESKTOP: AI for output, MicrophoneFX for input or ... for Discord
@@ -46,18 +46,9 @@ Always write mathematical expressions and formulas in plain English rather than 
 """
 
 ## TTS Parameters
-TTS_CHOICE = 'kokoro' # ["coqui", "orpheus", "kokoro"]
-ORPHEUS_TTS_MODEL = "orpheus-3b-0.1-ft"
-ORPHEUS_TTS_VOICE = "tara" # ["tara", "leah", "jess", "leo", "dan", "mia", "zac", "zoe"]
-ORPHEUS_TTS_TEMPERATURE = 0.5
-ORPHEUS_TTS_TOP_P = 0.9
-ORPHEUS_TTS_MAX_TOKENS = 2048
-ORPHEUS_TTS_REPEAT_PENALTY = 1.1
+TTS_CHOICE = 'kokoro'
 KOKORO_TTS_VOICE = "af_bella" # ["af_heart", "af_bella", "af_nicole", "am_fenrir", "am_michael", "am_puck", "bf_emma", "bf_isabella", "bm_george", "bm_fable", "bm_daniel"]
 KOKORO_TTS_LANG = "a" # "a" for american, "b" for british (must match voice)
-COQUI_TTS_MODEL = "tts_models/en/vctk/vits" # "tts_models/multilingual/multi-dataset/xtts_v2" 
-COQUI_TTS_REFERENCE_WAV = "xtts_reference.wav" # must be wav file
-COQUI_TTS_SPEAKER = "p234"
 
 ## Websearch Parameters
 ENABLE_WEBSEARCH = True  # Set to False to disable web search
