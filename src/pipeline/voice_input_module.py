@@ -124,8 +124,11 @@ class VoiceInputModule:
             # Check if this is a goodbye phrase and reset to wake word mode
             is_goodbye = self.is_goodbye_phrase(text)
             
-            command_queue.put({"text": text, "marker": "start", "continuation": continuation, "is_goodbye": is_goodbye})
-            command_queue.put({"text": text, "marker": "finish", "continuation": continuation, "is_goodbye": is_goodbye})
+            # Add timing information for benchmarking
+            command_start_time = time.time()
+            
+            command_queue.put({"text": text, "marker": "start", "continuation": continuation, "is_goodbye": is_goodbye, "start_time": command_start_time})
+            command_queue.put({"text": text, "marker": "finish", "continuation": continuation, "is_goodbye": is_goodbye, "start_time": command_start_time})
             
             # If goodbye phrase detected, reset conversation state
             if is_goodbye:

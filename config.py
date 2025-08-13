@@ -17,9 +17,9 @@ WAKEWORD_RESET_TIME = 45 # No wakeword needed unless no follow up command in WAK
 CONTINUATION_THRESHOLD = 0.5 # Number of seconds in which another command is considered an extension to previous command. Only matters when WAKEWORD_RESET_TIME > 0
 
 # LLM Params
-MAX_TOKENS = 3000 # depends on the model, enter lower value than max recommended
+MAX_TOKENS = 7000 # depends on the model, enter lower value than max recommended
 LLM_MODEL = "josiefied-qwen3-8b-abliterated-v1"
-ENABLE_THINK = False  # Prevents model from reasoning, only works with Qwen3 models
+ENABLE_THINK = True  # Prevents model from reasoning, only works with Qwen3 models
 TEMPERATURE = 0.7 # only modify if you know what you're doing
 TOP_P = 0.95 # only modify if you know what you're doing
 INITIAL_PROMPT = """

@@ -15,7 +15,7 @@ from src.osc import VRChatOSC
 class IntelligenceModule:
     def __init__(self, interrupt_count: SynchronizedClass, playback_active: SynchronizedClass, log_queue):
         setup_worker_logging(log_queue)
-        self.logger = get_logger("pipeline.intelligence")
+        self.logger = get_logger("speech_to_speech.pipeline.intelligence")
         self.interrupt_count = interrupt_count
         self.playback_active = playback_active
         self.osc = VRChatOSC()
@@ -173,6 +173,9 @@ class IntelligenceModule:
     def process_query(self, text: str, continuation: bool, is_goodbye: bool = False) -> tuple[str, bool]:
         current_time = time.time()
         
+        # Timing benchmarks for detailed profiling
+        stage_times = {}
+        
         # Prevent processing duplicate queries within 2 seconds
         if (text.strip().lower() == self.last_processed_query.strip().lower() and 
             current_time - self.last_processed_time < 2.0 and
@@ -213,7 +216,11 @@ class IntelligenceModule:
             response = random.choice(goodbye_responses)
             return response, False
         
+        # Benchmark RAG query
+        rag_start = time.time()
         query_results, has_confident_info = self.query_rag(text)
+        stage_times['rag_query'] = time.time() - rag_start
+        
         if self.interrupt_count.value > 0:
             self.interrupt_actions(text, info="querying RAG")
             return "", True
@@ -225,13 +232,21 @@ class IntelligenceModule:
             for result in query_results:
                 context += result["content"]
         elif ENABLE_WEBSEARCH:
+            # Benchmark websearch decision
+            websearch_decision_start = time.time()
             needs_search, topic, interrupted = self.decide_websearch_needed(text)
+            stage_times['websearch_decision'] = time.time() - websearch_decision_start
+            
             if interrupted:
                 self.interrupt_actions(text, info="Decide websearch")
                 return "", True
             
             if needs_search:
+                # Benchmark websearch execution
+                websearch_start = time.time()
                 search_results, interrupted = self.perform_websearch(text, topic)
+                stage_times['websearch_execution'] = time.time() - websearch_start
+                
                 if interrupted:
                     self.interrupt_actions(text, info="Performing websearch")
                     return "", True
@@ -243,13 +258,23 @@ class IntelligenceModule:
             else:
                 # No confident RAG info and no search needed - use no context
                 context = ""
+                stage_times['websearch_execution'] = 0
         else:
             # Web search disabled and no confident RAG info - use no context
             context = ""
         
+        # Benchmark LLM response generation
+        llm_start = time.time()
         response, interrupted = self.generate_response(text, context)
+        stage_times['llm_generation'] = time.time() - llm_start
+        
         if interrupted:
             self.interrupt_actions(text, info="LLM Query")
             return "", True
+        
+        # Log detailed timing breakdown
+        total_intelligence_time = sum(stage_times.values())
+        stage_breakdown = " | ".join([f"{k}: {v:.3f}s" for k, v in stage_times.items()])
+        self.logger.info(f"INTELLIGENCE BREAKDOWN - Total: {total_intelligence_time:.3f}s | {stage_breakdown}")
         
         return response, False

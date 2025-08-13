@@ -1,3 +1,4 @@
+import time
 from multiprocessing import Process, Queue, Event, Value
 from multiprocessing.synchronize import Event as EventClass
 from multiprocessing.sharedctypes import Synchronized as SynchronizedClass
@@ -17,7 +18,7 @@ def voice_worker_func(interrupt_count, playback_active, voice_setup_event, pipel
 
 def pipeline_worker_func(interrupt_count, playback_active, voice_setup_event, pipeline_setup_event, command_queue, log_queue):
     setup_worker_logging(log_queue)
-    logger = get_logger("pipeline.worker")
+    logger = get_logger("speech_to_speech.pipeline.worker")
     
     intelligence_module = IntelligenceModule(interrupt_count, playback_active, log_queue)
     audio_output_module = AudioOutputModule(interrupt_count, playback_active, log_queue)
@@ -35,16 +36,28 @@ def pipeline_worker_func(interrupt_count, playback_active, voice_setup_event, pi
             marker = work["marker"]
             continuation = work["continuation"]
             is_goodbye = work.get("is_goodbye", False)
+            start_time = work.get("start_time", time.time())
             
             if marker == "start":
+                # Benchmark: Intelligence processing start
+                intelligence_start_time = time.time()
                 response, interrupted = intelligence_module.process_query(text, continuation, is_goodbye)
+                intelligence_end_time = time.time()
                 
                 if not interrupted and response:
+                    # Benchmark: Playback start
+                    playback_start_time = time.time()
                     playback_active.value = 1  # Set flag to disable listening during playback
                     interrupted = audio_output_module.synthesize_and_play(
                         response, save_file="output.wav"
                     )
                     playback_active.value = 0  # Clear flag when playback completes
+                    
+                    # Calculate and log timing benchmarks
+                    total_processing_time = playback_start_time - start_time
+                    intelligence_processing_time = intelligence_end_time - intelligence_start_time
+                    
+                    logger.info(f"BENCHMARK - Total processing time: {total_processing_time:.3f}s | Intelligence: {intelligence_processing_time:.3f}s | Text: '{text[:50]}{'...' if len(text) > 50 else ''}'")
                 
                 # Clear interrupt context only if processing wasn't interrupted
                 if not interrupted:
