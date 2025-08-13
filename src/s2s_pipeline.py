@@ -9,8 +9,9 @@ os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 
 def main():
-  listener = start_listener()
-  logger = setup_logging()  
+  start_listener()
+  setup_logging()
+
   log_queue = get_log_queue()
   
   orchestrator = PipelineOrchestrator(log_queue)

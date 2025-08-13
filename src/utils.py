@@ -97,6 +97,12 @@ def play_wav_file(wav_bytes, logger, interrupt_count : SynchronizedClass | None 
       sublist_length = len(pcm_sublist)
       total_written_length = 0
       while total_written_length < sublist_length:
+        if interrupt_count and interrupt_count.value > 0:
+          logger.warning("Speaker interrupted during write")
+          speaker.stop()
+          speaker.delete()
+          return
+
         written_length = speaker.write(pcm_sublist[total_written_length:])
         total_written_length += written_length
 
@@ -107,6 +113,12 @@ def play_wav_file(wav_bytes, logger, interrupt_count : SynchronizedClass | None 
   worker_thread.start()
   
   while not completion_event.is_set():
+    if interrupt_count and interrupt_count.value > 0:
+      logger.warning("Speaker interrupted during flush")
+      completion_event.set()
+      speaker.stop()
+      speaker.delete()
+      return
     completion_event.wait(timeout=0.1)
   worker_thread.join()
 

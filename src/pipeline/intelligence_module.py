@@ -1,10 +1,9 @@
-import threading
 import time
 import re
 import random
 from multiprocessing.sharedctypes import Synchronized as SynchronizedClass
 
-from config import TTS_CHOICE, RAG_CONFIDENCE_THRESHOLD, ENABLE_WEBSEARCH
+from config import RAG_CONFIDENCE_THRESHOLD, ENABLE_WEBSEARCH
 from src.logging_config import setup_worker_logging, get_logger
 from src.llm_wrapper import LLMWrapper
 from src.rag_langchain import RAGLangchain
@@ -195,7 +194,7 @@ class IntelligenceModule:
             self.logger.info(f"Skipping meaningless short prompt: '{text}'")
             return "", False
         
-        if continuation:
+        if continuation and self.llm.interrupt_context:
             self.llm.interrupt_context.pop()
         
         if self.interrupt_count.value > 0:

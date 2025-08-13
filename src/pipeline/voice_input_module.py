@@ -93,10 +93,6 @@ class VoiceInputModule:
         pipeline_setup_event.wait()
         
         while True:
-            # Skip all listening when playback is active
-            if self.playback_active.value > 0:
-                time.sleep(0.1)  # Brief sleep to prevent busy loop
-                continue
                 
             if self.should_reset_wakeword():
                 self.logger.warning("wakeword reset")
