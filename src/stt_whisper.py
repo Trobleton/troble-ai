@@ -1,7 +1,6 @@
 from faster_whisper import WhisperModel
 import logging
 
-
 class STTWhisper:
   def __init__(self, vad_active, device):
     self.logger = logging.getLogger("speech_to_speech.stt_whisper")
@@ -22,4 +21,3 @@ class STTWhisper:
     self.logger.debug("Speech Parsed!")
     
     return list(segments)
-    

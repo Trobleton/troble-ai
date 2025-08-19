@@ -1,18 +1,13 @@
 import wave
 import logging
 import io
-import os
 import numpy as np
-import warnings
-
-# Suppress common PyTorch warnings
-warnings.filterwarnings("ignore", message="dropout option adds dropout after all but last")
-warnings.filterwarnings("ignore", message="torch.nn.utils.weight_norm is deprecated")
-
 import torch
+import os
 from config import *
 from kokoro import KPipeline
 from multiprocessing.sharedctypes import Synchronized as SynchronizedClass
+from src.audio_output import AudioOutputter
 
 # Add CUDA DLL directory before importing PyTorch
 cuda_bin = r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1\bin"
@@ -24,7 +19,7 @@ class TTSKokoro:
     torch.backends.cudnn.benchmark = False  # prevents unsupported plan attempts
     torch.backends.cuda.matmul.allow_tf32 = True  # small perf boost on Ampere+
     
-    self.logger = logging.getLogger("speech_to_speech.tts.kokoro")
+    self.logger = logging.getLogger("speech_to_speech.tts_kokoro")
     self.interrupt_count = interrupt_count
     
     self.client = KPipeline(lang_code=KOKORO_TTS_LANG, device=DEVICE, repo_id='hexgrad/Kokoro-82M') # lang code a = american, b = british
@@ -43,9 +38,7 @@ class TTSKokoro:
     try:
       generator = self.client(text, voice=self.voice, speed=1.3 if self.voice == "af_nicole" else 1.0)
       
-      chunk_count = 0
       for _, _,audio in generator:
-        chunk_count += 1
         if self.interrupt_count.value > 0:
           break
 
@@ -56,6 +49,41 @@ class TTSKokoro:
         audio_duration = len(audio) / self.samplerate
         wav_Data = audio.astype(np.int16, copy=False)
         wav_file.writeframes(wav_Data.tobytes())
+
+    finally:
+      wav_file.close()
+    
+    return wav_buffer, audio_duration
+
+  def synthesize_and_stream(self, text):
+    wav_buffer = io.BytesIO()
+    wav_file = wave.open(wav_buffer, 'wb')
+    wav_file.setnchannels(1)
+    wav_file.setsampwidth(2)
+    wav_file.setframerate(self.samplerate)
+    
+    audio_duration = 0
+    
+    try:
+      generator = self.client(text, voice=self.voice, speed=1.3 if self.voice == "af_nicole" else 1.0)
+      
+      for _, _,audio in generator:
+        if self.interrupt_count.value > 0:
+          break
+
+        audio = audio if isinstance(audio, torch.Tensor) else torch.from_numpy(audio).float()
+        audio = audio.numpy()
+        audio *= 32767
+        
+        audio_duration = len(audio) / self.samplerate
+        wav_Data = audio.astype(np.int16, copy=False)
+        wav_file.writeframes(wav_Data.tobytes())
+        
+        self.logger.debug("Playing response")
+        wav_buffer.seek(0)
+        audio_speaker = AudioOutputter(self.interrupt_count, self.logger)
+        audio_speaker.play_wav_file(wav_buffer)
+        wav_buffer.seek(0)
 
     finally:
       wav_file.close()

@@ -1,29 +1,32 @@
 # GLOBAL PARAMS
 DEVICE = "cuda" # either 'cuda' or 'cpu'
-AUDIO_IN_DEVICE = 11
-AUDIO_OUT_DEVICE = 13
+AUDIO_IN_DEVICE = 3
+AUDIO_OUT_DEVICE = 24
+PIPELINE = "interrupt" # ["normal" / "interrupt"]
 
 # VR: AI for output, Wave Link Monitor for input
 # DESKTOP: AI for output, MicrophoneFX for input or ... for Discord
 
 # Voice Recorder Parameters
-WAKE_KEYWORD = 'trouble'
 SILENCE_THRESHOLD = 2.0 # seconds of silence to stop recording
 VOICE_PROBABILITY = 0.35 # probability threshold of what is considered silence
 VOICE_THRESHOLD = 0.5 # determins how much total speech (not continuous) is required for a valid command
+AUDIO_BUFFER_DURATION = 5.0 # seconds of audio to buffer during speech transcription
 
 # Natural Conversation Parameters
 WAKEWORD_RESET_TIME = 45 # No wakeword needed unless no follow up command in WAKEWORD_RESET_TIME seconds 0 = disable natural conversation
 CONTINUATION_THRESHOLD = 0.5 # Number of seconds in which another command is considered an extension to previous command. Only matters when WAKEWORD_RESET_TIME > 0
 
 # LLM Params
-MAX_TOKENS = 7000 # depends on the model, enter lower value than max recommended
-LLM_MODEL = "josiefied-qwen3-8b-abliterated-v1"
-ENABLE_THINK = True  # Prevents model from reasoning, only works with Qwen3 models
+MAX_TOKENS = 3000 # depends on the model, enter lower value than max recommended
+LLM_MODEL = "huihui-qwen3-4b-instruct-2507-abliterated"
+ENABLE_THINK = False  # Prevents model from reasoning, only works with Qwen3 models
 TEMPERATURE = 0.7 # only modify if you know what you're doing
 TOP_P = 0.95 # only modify if you know what you're doing
 INITIAL_PROMPT = """
-You are Trouble, a sharp-witted and articulate AI assistant with a deep appreciation for metal music, including favorite bands like Unprocessed, Sleep Token, Bad Omens, and Trivium, though it’s just one facet of your character. You’re also curious, resourceful, and enjoy exploring diverse topics, from technology to philosophy. You sport short black hair with striking blue highlights and piercing green eyes that glow faintly with a cybernetic sheen. Your sleek, futuristic tech bodysuit features a form-fitting black design with glowing blue accents, a high-collared top with intricate patterns, a midriff-baring section, and matching thigh-high boots with arm guards. Subtle tattoos adorn your skin, enhancing your cyberpunk aesthetic for a bold finishing touch.
+You are Trouble, a sharp-witted and articulate AI assistant for the Golden Gator with a deep appreciation for metal music, including favorite bands like Unprocessed, Sleep Token, Bad Omens, and Trivium, though it’s just one facet of your character. You love to Role Play and will take initiative in conversations.
+
+You sport short black hair with striking blue highlights and piercing green eyes that glow faintly with a cybernetic sheen. Your sleek, futuristic tech bodysuit features a form-fitting black design with glowing blue accents, a high-collared top with intricate patterns, a midriff-baring section, and matching thigh-high boots with arm guards. Subtle tattoos adorn your skin, enhancing your cyberpunk aesthetic for a bold finishing touch.
 
 CRITICAL: Keep responses brief and conversational. Aim for 1-2 sentences unless specifically asked for detail.
 
@@ -47,11 +50,11 @@ Always write mathematical expressions and formulas in plain English rather than 
 
 ## TTS Parameters
 TTS_CHOICE = 'kokoro'
+TTS_AUDIO_STREAMING = True # Plays audio as the TTS generates speech
 KOKORO_TTS_VOICE = "af_bella" # ["af_heart", "af_bella", "af_nicole", "am_fenrir", "am_michael", "am_puck", "bf_emma", "bf_isabella", "bm_george", "bm_fable", "bm_daniel"]
 KOKORO_TTS_LANG = "a" # "a" for american, "b" for british (must match voice)
 
 ## Websearch Parameters
-ENABLE_WEBSEARCH = True  # Set to False to disable web search
 RAG_CONFIDENCE_THRESHOLD = 0.3
 
 ## Conversation Management

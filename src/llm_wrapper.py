@@ -58,16 +58,9 @@ class LLMWrapper():
     
     self._load_convo_history()
     
+    
   def _load_convo_history(self):
     self.logger.debug("Loading conversation history")
-
-    if not os.path.exists(self.chat_history_path):
-      self.logger.debug("Chat history file doesn't exist, creating empty history")
-      os.makedirs(os.path.dirname(self.chat_history_path), exist_ok=True)
-      with open(self.chat_history_path, 'w', encoding="utf-8") as f:
-        json.dump({"history": []}, f)
-      self.global_chat_history = []
-      return
 
     chat_history_file = open(self.chat_history_path, 'r', encoding="utf-8")
     self.global_chat_history = json.load(chat_history_file)["history"]
@@ -79,6 +72,9 @@ class LLMWrapper():
       self.current_chat_history.insert(0, cur_message["message"])
       self.current_chat_history_length += cur_message["length"]
       index -= 1
+      
+    # print(self.current_chat_history)
+
 
   def _write_chat_history(self):
     self.logger.debug(f"Saving conversation history")
@@ -91,16 +87,17 @@ class LLMWrapper():
     )
     chat_history_file.close()
 
+
   def _filter_think(self, text):
     marker = "</think>"
     index = text.find(marker)
     
-    if index != -1:
-      # Found the marker, return text after it
-      filtered_text = text[index + len(marker):].replace("\n", "")
-    else:
-      # No marker found, return original text
-      filtered_text = text.replace("\n", "")
+    # Think not found
+    if index == -1:
+      return text
+    
+    index = index + len(marker)
+    filtered_text = text[index:].replace("\n", "")
     
     return filtered_text
 
@@ -135,17 +132,6 @@ class LLMWrapper():
     filtered_text = emoji_pattern.sub(r'', text)
     
     return filtered_text
-  
-  def _filter_expressions(self, text):
-    """Remove TTS expressions like <smile>, <laugh>, etc."""
-    # Pattern to match expressions in angle brackets
-    expression_pattern = re.compile(r'<[^>]*>', re.IGNORECASE)
-    filtered_text = expression_pattern.sub('', text)
-    
-    # Clean up any double spaces that might result from removing expressions
-    filtered_text = re.sub(r'\s+', ' ', filtered_text).strip()
-    
-    return filtered_text
 
   def decide_websearch(self, text):
     prompt_messages = [
@@ -177,31 +163,10 @@ class LLMWrapper():
     response_text = self._filter_emoji(response_text)
     response_text = self._filter_markdown(response_text)
     
-    # Remove expressions like <smile>, <laugh> when using Kokoro TTS
-    if TTS_CHOICE == "kokoro":
-      response_text = self._filter_expressions(response_text)
-    
-    # Handle cases where the LLM doesn't follow the expected format
-    if "+-+" in response_text:
-      require_search, topic = response_text.split("+-+")
-    else:
-      # Fallback: try to parse manually or default to no search
-      self.logger.warning(f"LLM response doesn't contain expected separator '+-+': '{response_text}'")
-      response_lower = response_text.lower().strip()
-      if response_lower.startswith("yes"):
-        require_search = "yes"
-        # Try to extract topic after "yes"
-        topic_match = response_text.lower().replace("yes", "").strip()
-        topic = topic_match if topic_match else "general search"
-      elif response_lower.startswith("no"):
-        require_search = "no"
-        topic = "none"
-      else:
-        # Default to no search if we can't parse
-        require_search = "no" 
-        topic = "none"
+    require_search, topic = response_text.split("+-+")
 
     return require_search.lower(), topic.lower()
+
 
   def send_to_llm(self, text, context = ""):
     if not ENABLE_THINK:
@@ -225,10 +190,10 @@ class LLMWrapper():
     self.current_chat_history_length += interrupt_text_length
     
     while self.current_chat_history and ((self.current_chat_history_length + self.initial_prompt_length) >= self.max_tokens ):
-      removed_message = self.current_chat_history.pop(0)
-      removed_chat_length = len(removed_message["content"].split(" "))
+      removed_chat_length = len(self.current_chat_history.pop(0).split(" "))
       self.current_chat_history_length -= removed_chat_length
     
+    # print(json.dumps(self.current_chat_history, indent=2))
     prompt_messages = [{"role": "system", "content": self.initial_prompt}]
     prompt_messages.extend(self.current_chat_history)
     
@@ -238,9 +203,7 @@ class LLMWrapper():
     
     prompt_messages[-1]["content"] =  prompt_modification + prompt_messages[-1]["content"]
     
-    # Log the complete prompt being sent to LLM
-    self.logger.info(f"PROMPT: {prompt_messages[-1]['content']}")
-    
+    # print(prompt_messages)
     response_text = ""
     
     stream = self.client.chat.completions.create(
@@ -264,13 +227,6 @@ class LLMWrapper():
     response_text = self._filter_emoji(response_text)
     response_text = self._filter_markdown(response_text)
     
-    # Remove expressions like <smile>, <laugh> when using Kokoro TTS
-    if TTS_CHOICE == "kokoro":
-      response_text = self._filter_expressions(response_text)
-    
-    # Log the generated response
-    self.logger.info(f"RESPONSE: {response_text}")
-    
     response_length = len(response_text.split(" "))
     
     self.global_chat_history.append({
@@ -290,7 +246,3 @@ class LLMWrapper():
     self.logger.debug("Response returned")
 
     return response_text
-    
-    
-    
-    

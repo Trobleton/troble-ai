@@ -8,3 +8,4 @@ data/*
 chat_history.json
 output.wav
 command.wav
+conversation/*
