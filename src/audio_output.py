@@ -2,6 +2,7 @@ import logging
 import wave
 import array
 import threading
+import io
 from pvspeaker import PvSpeaker
 from multiprocessing.sharedctypes import Synchronized as SynchronizedClass
 from config import *
@@ -118,7 +119,17 @@ class AudioOutputter():
 
 
   def play_wav_file(self, wav_bytes):
-    wav_file = wave.open(wav_bytes, 'rb')
+    if isinstance(wav_bytes, io.BytesIO):
+      wav_bytes.seek(0)
+      # Create a new BytesIO from the data to ensure it's properly readable
+      wav_data = wav_bytes.getvalue()
+      wav_bytes = io.BytesIO(wav_data)
+    
+    try:
+      wav_file = wave.open(wav_bytes, 'rb')
+    except Exception as e:
+      self.logger.error(f"Error opening wav file: {e}, type: {type(wav_bytes)}")
+      return
     sample_rate = wav_file.getframerate()
     bits_per_sample = wav_file.getsampwidth() * 8
     num_channels = wav_file.getnchannels()

@@ -1,11 +1,8 @@
 # GLOBAL PARAMS
 DEVICE = "cuda" # either 'cuda' or 'cpu'
 AUDIO_IN_DEVICE = 3
-AUDIO_OUT_DEVICE = 24
+AUDIO_OUT_DEVICE = 23
 PIPELINE = "interrupt" # ["normal" / "interrupt"]
-
-# VR: AI for output, Wave Link Monitor for input
-# DESKTOP: AI for output, MicrophoneFX for input or ... for Discord
 
 # Voice Recorder Parameters
 SILENCE_THRESHOLD = 2.0 # seconds of silence to stop recording

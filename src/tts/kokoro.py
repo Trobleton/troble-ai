@@ -80,10 +80,16 @@ class TTSKokoro:
         wav_file.writeframes(wav_Data.tobytes())
         
         self.logger.debug("Playing response")
-        wav_buffer.seek(0)
+        # Create a separate WAV buffer for playback to avoid corruption
+        playback_buffer = io.BytesIO()
+        with wave.open(playback_buffer, 'wb') as playback_wav:
+          playback_wav.setnchannels(1)
+          playback_wav.setsampwidth(2)
+          playback_wav.setframerate(self.samplerate)
+          playback_wav.writeframes(wav_Data.tobytes())
+        
         audio_speaker = AudioOutputter(self.interrupt_count, self.logger)
-        audio_speaker.play_wav_file(wav_buffer)
-        wav_buffer.seek(0)
+        audio_speaker.play_wav_file(playback_buffer)
 
     finally:
       wav_file.close()

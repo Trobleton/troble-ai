@@ -36,7 +36,7 @@ def wake_word_stt_worker(
   logger = get_logger("speech_to_speech.voice_worker")
   logger.debug("Setting up WakeWord and STT")
   
-  audio_speaker = AudioOutputter(interrupt_count, logger)
+  AudioOutputter(interrupt_count, logger)
   audio_buffer_signal = Event()
   audio_recorder = Recorder(audio_buffer_signal)
   audio_buffer = audio_recorder.get_audio_buffer_instance()
@@ -62,23 +62,24 @@ def wake_word_stt_worker(
     if (time.time() - last_command_time) > WAKEWORD_RESET_TIME:
       logger.warning("wakeword reset")
       ask_wakeword = True
+      vrc_avatar.set_avatar_color(0.0)
 
     if ask_wakeword:
       logger.debug("Listening for wake word...")
       audio_recorder.record_wake_word()
       ask_wakeword = False
       audio_buffer.clear_buffer()
-      vrc_avatar.set_avatar_color(0)
+      vrc_avatar.set_avatar_color(0.0)
 
       if not command_queue.empty():
         # If queue is not empty, it means that pipeline is still processing it
         # increment interrupt count
         logger.warning("interrupt fired")
         interrupt_count.value += 1
-        vrc_avatar.set_avatar_color(0.5)
+        vrc_avatar.set_avatar_color(0.50)
 
-    logger.debug("Listening for command...")
     if first_loop:
+      logger.debug("Listening for command...")
       vrc_avatar.set_avatar_color(0.75)
     command_buffer, command_duration = audio_recorder.record_command(ask_wakeword, command_queue, interrupt_count)
 
@@ -88,7 +89,8 @@ def wake_word_stt_worker(
     
     num_samples = command_size // 2
     if num_samples < audio_recorder.porcupine.sample_rate * (VOICE_THRESHOLD + SILENCE_THRESHOLD):
-      logger.debug("No speech detected.")
+      if first_loop:
+        logger.debug("No speech detected.")
       continue
     
     extra_time_start = time.time()

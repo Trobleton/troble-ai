@@ -21,22 +21,25 @@ class LLMWrapper():
     self.current_chat_history_length = 0
     project_root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     self.chat_history_path = os.path.join(project_root_dir, "data", "chat_history.json")
+
+    if not os.path.exists(self.chat_history_path):
+      with open(self.chat_history_path, 'w', encoding="utf-8") as f:
+        json.dump({"history": []}, f)
+
     self.max_tokens = int(MAX_TOKENS * 0.75)
     
     self.initial_prompt = INITIAL_PROMPT
     self.initial_prompt += "Do not style your response using markdown formatting. Note that you responses must be in a conversation format, thus not text fomatting is allowed to make the output look nice after it has been rendered."
-    if TTS_CHOICE == "orpheus":
-      self.initial_prompt += " Also, add paralinguistic elements like <laugh>, <chuckle>, <sigh>, <cough>, <sniffle>, <groan>, <yawn>, <gasp> or uhm for more human-like speech whenever it fits, but do not overdo it, please only add it when necessary and not often."
     if TTS_CHOICE == "kokoro":
       self.initial_prompt += "Here are some rules regarding how the output should be formatted such that it could work with text-to-speech. 1. To adjust intonation, try punctuation ;:,.!?—…\"()“” or stress ˈ and ˌ"
     self.initial_prompt = self.initial_prompt.replace("\n", "")
     self.initial_prompt_length = len(self.initial_prompt.split(" "))
     
     self.websearch_classifier_prompt = """
-    You are a classifier that determines whether a user’s request requires an external web search, and if so, what the concise web search query should be.
+    You are a classifier that determines whether a user’s request requires an external web search, and if so, what the concise web search query should be. Ensure that you use conversation history when performing the tasks. Note that some past conversations may or may not be relevant to the current prompt, so perform the task with this in mind.
 
     Rules for deciding:
-    - Answer "yes" if the prompt is about facts, knowledge, history, current events, or time-sensitive information
+    - Answer "yes" ONLY if the prompt does not contain general knowledge comments or questions and only if the prompt is about non-general knowledge facts, history, current events, or time-sensitive information
     - Answer "no" if the request can be answered without external knowledge (general conversation, opinions, jokes, instructions, etc.).
     - If answering "yes", provide a corrected, concise search query containing only the essential topic and keywords limited to no more than 10 words.
     - If answering "no", the main topic should be "None".
@@ -87,7 +90,6 @@ class LLMWrapper():
     )
     chat_history_file.close()
 
-
   def _filter_think(self, text):
     marker = "</think>"
     index = text.find(marker)
@@ -136,8 +138,19 @@ class LLMWrapper():
   def decide_websearch(self, text):
     prompt_messages = [
       {"role": "system", "content": self.websearch_classifier_prompt},
-      {"role": "user", "content": text + "/no_think"}
     ]
+    
+    user_prompt_history = []
+    for entry in self.current_chat_history[::-1]:
+      if entry["role"] == "user":
+        user_prompt_history.insert(0, entry)
+        if len(user_prompt_history) == 5:
+          break
+      else:
+        pass
+    
+    prompt_messages.extend(user_prompt_history)
+    prompt_messages.extend([{"role": "user", "content": text + "/no_think"}])
     
     response_text = ""
     
@@ -166,7 +179,6 @@ class LLMWrapper():
     require_search, topic = response_text.split("+-+")
 
     return require_search.lower(), topic.lower()
-
 
   def send_to_llm(self, text, context = ""):
     if not ENABLE_THINK:
