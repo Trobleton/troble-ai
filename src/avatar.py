@@ -101,6 +101,7 @@ class VRCAvatar:
     # Convenience methods for each state
     def set_idle(self):
         self.set_avatar_color(self.STATE_IDLE)
+        self.vrchat_osc.clear_message()
     
     def set_playback(self):
         self.set_avatar_color(self.STATE_PLAYBACK)
@@ -110,3 +111,4 @@ class VRCAvatar:
     
     def set_listening(self):
         self.set_avatar_color(self.STATE_LISTENING)
+        self.vrchat_osc.send_message("Listening...")
