@@ -5,6 +5,8 @@ import threading
 import io
 from pvspeaker import PvSpeaker
 from multiprocessing.sharedctypes import Synchronized as SynchronizedClass
+from multiprocessing.synchronize import Lock as LockClass
+from multiprocessing.queues import Queue as QueueClass
 from typing import Union
 from config import *
 
@@ -46,3 +48,12 @@ def save_wav_file(wav_bytes, text, wav_filename, logger):
     txt_file.write(text.replace("\n", " "))
 
   logger.debug(f"Audio successfully saved to {wav_filename}")
+  
+def is_queue_empty(lock: LockClass, queue: QueueClass):
+  empty = False
+
+  lock.acquire()
+  empty = queue.empty()
+  lock.release()
+
+  return empty

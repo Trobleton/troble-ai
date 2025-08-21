@@ -3,12 +3,19 @@ import json
 from src.osc import VRChatOSC
 
 class VRCAvatar:
+    # Color state constants
+    STATE_IDLE = 0.0
+    STATE_PLAYBACK = 0.25
+    STATE_INTERRUPTED = 0.50
+    STATE_LISTENING = 0.75
+    
     def __init__(self):
         self.vrchat_user_id = self._get_most_recent_user_id()
         
         self.vrchat_osc = VRChatOSC()
         self.avatar_id = "avtr_92982fd4-aedd-4adf-a5c6-e513b506dcd7"
         self.avatar_path = os.path.join(os.environ['USERPROFILE'], 'AppData', 'LocalLow', 'VRChat', 'VRChat', "OSC", self.vrchat_user_id, "Avatars")
+        self.current_color_state = None  # Track current color state to prevent redundant changes
     
     def _get_most_recent_user_id(self):
         osc_path = os.path.join(os.environ['USERPROFILE'], 'AppData', 'LocalLow', 'VRChat', 'VRChat', "OSC")
@@ -60,6 +67,10 @@ class VRCAvatar:
             return None
         
     def set_avatar_color(self, color):
+        # Only change color if it's different from current state
+        if self.current_color_state == color:
+            return  # Prevent redundant color changes
+        
         avatar_data = self.get_current_avatar()
         if not avatar_data:
             print("Error: Could not retrieve avatar data")
@@ -85,3 +96,17 @@ class VRCAvatar:
 
         # Set the avatar color using the VRChatOSC instance
         self.vrchat_osc.send_avatar_parameter(clothing_param_name, color)
+        self.current_color_state = color  # Update current state
+    
+    # Convenience methods for each state
+    def set_idle(self):
+        self.set_avatar_color(self.STATE_IDLE)
+    
+    def set_playback(self):
+        self.set_avatar_color(self.STATE_PLAYBACK)
+    
+    def set_interrupted(self):
+        self.set_avatar_color(self.STATE_INTERRUPTED)
+    
+    def set_listening(self):
+        self.set_avatar_color(self.STATE_LISTENING)

@@ -1,7 +1,7 @@
 # GLOBAL PARAMS
 DEVICE = "cuda" # either 'cuda' or 'cpu'
-AUDIO_IN_DEVICE = 3
-AUDIO_OUT_DEVICE = 23
+AUDIO_IN_DEVICE = 10
+AUDIO_OUT_DEVICE = 1
 PIPELINE = "interrupt" # ["normal" / "interrupt"]
 
 # Voice Recorder Parameters
@@ -53,6 +53,8 @@ KOKORO_TTS_LANG = "a" # "a" for american, "b" for british (must match voice)
 
 ## Websearch Parameters
 RAG_CONFIDENCE_THRESHOLD = 0.3
+ENABLE_RAG = False  # Set to False to disable RAG functionality
+ENABLE_WEB_SEARCH = False  # Set to False to disable web search functionality
 
 ## Conversation Management
 GOODBYE_PHRASES = [

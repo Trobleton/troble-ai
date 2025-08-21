@@ -3,8 +3,9 @@ import os
 import io
 import logging
 from config import *
-from multiprocessing import Process, Queue, Event, Value
+from multiprocessing import Process, Queue, Event, Value, Lock
 from multiprocessing.synchronize import Event as EventClass
+from multiprocessing.synchronize import Lock as LockClass
 from multiprocessing.sharedctypes import Synchronized as SynchronizedClass
 from multiprocessing.queues import Queue as QueueClass
 import threading
@@ -13,7 +14,7 @@ import time
 from src.logging_config import setup_logging, start_listener, stop_listener, setup_worker_logging, get_logger, get_log_queue
 from src.voice_recorder import Recorder
 from src.stt_whisper import STTWhisper
-from src.utils import save_wav_file
+from src.utils import save_wav_file, is_queue_empty
 from src.llm_wrapper import LLMWrapper
 from src.rag_langchain import RAGLangchain
 from src.web_search import WebSearcher
@@ -30,6 +31,8 @@ def wake_word_stt_worker(
   voice_setup_event : EventClass,
   pipeline_setup_event: EventClass,
   command_queue: QueueClass,
+  avatar_queue: QueueClass,
+  command_queue_lock: LockClass,
   log_queue
 ):
   setup_worker_logging(log_queue)
@@ -47,12 +50,11 @@ def wake_word_stt_worker(
   if not os.path.exists(output_dir):
     os.makedirs(output_dir)
   
-  vrc_avatar = VRCAvatar()
-  
   first_loop = True
   ask_wakeword = True
   last_command_time = 0
   prev_text = ""
+  interrupt_color_active = False
 
   voice_setup_event.set()
   logger.debug("Waiting for Pipeline to setup")
@@ -62,26 +64,37 @@ def wake_word_stt_worker(
     if (time.time() - last_command_time) > WAKEWORD_RESET_TIME:
       logger.warning("wakeword reset")
       ask_wakeword = True
-      vrc_avatar.set_avatar_color(0.0)
+      avatar_queue.put("idle")
 
     if ask_wakeword:
       logger.debug("Listening for wake word...")
       audio_recorder.record_wake_word()
       ask_wakeword = False
       audio_buffer.clear_buffer()
-      vrc_avatar.set_avatar_color(0.0)
+      avatar_queue.put("idle")
 
-      if not command_queue.empty():
+      if not is_queue_empty(command_queue_lock, command_queue):
         # If queue is not empty, it means that pipeline is still processing it
         # increment interrupt count
         logger.warning("interrupt fired")
         interrupt_count.value += 1
-        vrc_avatar.set_avatar_color(0.50)
+        avatar_queue.put("interrupted")
+        interrupt_color_active = True
+        
+        # Reset avatar color to 0.75 after 3 seconds
+        def reset_avatar_color():
+          time.sleep(3)
+          nonlocal interrupt_color_active
+          interrupt_color_active = False
+          # avatar_queue.put("listening")
+        
+        reset_thread = threading.Thread(target=reset_avatar_color, daemon=True)
+        reset_thread.start()
 
     if first_loop:
       logger.debug("Listening for command...")
-      vrc_avatar.set_avatar_color(0.75)
-    command_buffer, command_duration = audio_recorder.record_command(ask_wakeword, command_queue, interrupt_count)
+      avatar_queue.put("listening")
+    command_buffer, command_duration = audio_recorder.record_command(ask_wakeword, command_queue, command_queue_lock, interrupt_count)
 
     command_buffer.seek(0, io.SEEK_END)
     command_size = command_buffer.tell() # size of command buffer in bytes
@@ -145,6 +158,8 @@ def websearch_llm_tts_worker(
   voice_setup_event : EventClass,
   pipeline_setup_event: EventClass,
   command_queue: QueueClass,
+  avatar_queue: QueueClass,
+  command_queue_lock: LockClass,
   log_queue
 ):
   setup_worker_logging(log_queue)
@@ -155,8 +170,8 @@ def websearch_llm_tts_worker(
   llm = LLMWrapper(
     interrupt_count=interrupt_count
   )
-  websearch = WebSearcher(interrupt_count=interrupt_count)
-  rag = RAGLangchain(interrupt_count=interrupt_count)
+  websearch = WebSearcher(interrupt_count=interrupt_count) if ENABLE_WEB_SEARCH else None
+  rag = RAGLangchain(interrupt_count=interrupt_count) if ENABLE_RAG else None
   
   if TTS_CHOICE == "kokoro":
     tts = TTSKokoro(interrupt_count=interrupt_count)
@@ -167,19 +182,24 @@ def websearch_llm_tts_worker(
   def interrupt_actions(text, info):
     logger.warning(f"Pipeline Interrupted: {info}")
     llm.interrupt_context.append(text)
+    end_marker = command_queue.get()
+    logger.debug(end_marker)
+    interrupt_count.value -= 1
     
   def searching_speech_worker(tts, text, interrupt_count, logger):
     audio_speaker = AudioOutputter(interrupt_count, logger)
     output_buffer, output_duration = tts.synthesize(text)
     output_buffer.seek(0)
+    avatar_queue.put("playback")
     audio_speaker.play_wav_file(output_buffer)
+    avatar_queue.put("listening")
 
   pipeline_setup_event.set()
   logger.debug("Waiting for voice recording to setup")
   voice_setup_event.wait()
   
   while True:
-    if not command_queue.empty():
+    if not is_queue_empty(command_queue_lock, command_queue):
       work = command_queue.get()
       logger.debug(work)
       text = work["text"]
@@ -197,73 +217,79 @@ def websearch_llm_tts_worker(
           interrupt_actions(text, info="before pipeline start")
           continue
         
-        # First query RAG to see if there exists info in RAG
-        query_results = []
-        logger.debug(f"Querying RAG")
-        query_results = rag.query(text)
-        if interrupt_count.value > 0:
-          interrupt_actions(text, info="querying RAG")
-          continue
-        # add extra 0 in case RAG is empty and returns empty list
-        query_result_scores = [query["score"] for query in query_results] + [0]
-        
-        # Only check for websearch if not good data in RAG
-        if max(query_result_scores) < RAG_CONFIDENCE_THRESHOLD:
-          logger.debug(f"Not enough confident info in RAG, decide search")
-          decision, topic = llm.decide_websearch(text)
-          if interrupt_count.value > 0:
-            interrupt_actions(text, info="Decide websearch")
-            continue
-          logger.debug(f"Websearch recommended?: {decision} - {topic}")
-
-          # IF websearch needed, perform websearch
-          if decision == "yes":           
-            # PLay search speech while web search occurs
-            speech_thread = threading.Thread(target=searching_speech_worker, args=(tts, f"Searching the web for {topic}", interrupt_count, logger), daemon=True)
-            speech_thread.start()
-            
-            # Get list of websites
-            websites = websearch.ddg_search(topic)
-            if interrupt_count.value > 0:
-              interrupt_actions(text, info="DDG Search")
-              continue
-            
-            # Fetch content from websites
-            logger.debug(f"Fetching website contents")
-            web_contents = websearch.fetch_content(websites)
-            if interrupt_count.value > 0:
-              interrupt_actions(text, info="Fetching website contents")
-              continue
-            
-            # Add website data to RAG
-            logger.debug(f"Adding contents to RAG")
-            interrupt_detected = False
-            for document in web_contents:
-              logging.info(document)
-              if interrupt_count.value > 0:
-                interrupt_actions(text, info="Adding document to RAG")
-                interrupt_detected = True
-                break
-              rag.add_document(document)
-            if interrupt_detected:
-              continue
-            
-            # Update the RAG query
-            logger.debug(f"Querying RAG Again")
-            query_results = rag.query(topic)
-            logger.info(query_results)
-            if interrupt_count.value > 0:
-              interrupt_actions(text, info="Querying RAG")
-              continue
-
-            speech_thread.join()
-
-        logger.debug(f"Info in RAG exists, no search needed")
-        
+        # Initialize context and query results
         context = ""
-        # Parse contents from RAG query
-        for result in query_results:
-          context += result["content"]
+        query_results = []
+        
+        # Only use RAG and web search if enabled
+        if ENABLE_RAG and rag is not None:
+          # First query RAG to see if there exists info in RAG
+          logger.debug(f"Querying RAG")
+          query_results = rag.query(text)
+          if interrupt_count.value > 0:
+            interrupt_actions(text, info="querying RAG")
+            continue
+          # add extra 0 in case RAG is empty and returns empty list
+          query_result_scores = [query["score"] for query in query_results] + [0]
+          
+          # Only check for websearch if not good data in RAG and web search is enabled
+          if ENABLE_WEB_SEARCH and websearch is not None and max(query_result_scores) < RAG_CONFIDENCE_THRESHOLD:
+            logger.debug(f"Not enough confident info in RAG, decide search")
+            decision, topic = llm.decide_websearch(text)
+            if interrupt_count.value > 0:
+              interrupt_actions(text, info="Decide websearch")
+              continue
+            logger.debug(f"Websearch recommended?: {decision} - {topic}")
+
+            # IF websearch needed, perform websearch
+            if decision == "yes":           
+              # PLay search speech while web search occurs
+              speech_thread = threading.Thread(target=searching_speech_worker, args=(tts, f"Searching the web for {topic}", interrupt_count, logger), daemon=True)
+              speech_thread.start()
+              
+              # Get list of websites
+              websites = websearch.ddg_search(topic)
+              if interrupt_count.value > 0:
+                interrupt_actions(text, info="DDG Search")
+                continue
+              
+              # Fetch content from websites
+              logger.debug(f"Fetching website contents")
+              web_contents = websearch.fetch_content(websites)
+              if interrupt_count.value > 0:
+                interrupt_actions(text, info="Fetching website contents")
+                continue
+              
+              # Add website data to RAG
+              logger.debug(f"Adding contents to RAG")
+              interrupt_detected = False
+              for document in web_contents:
+                logging.info(document)
+                if interrupt_count.value > 0:
+                  interrupt_actions(text, info="Adding document to RAG")
+                  interrupt_detected = True
+                  break
+                rag.add_document(document)
+              if interrupt_detected:
+                continue
+              
+              # Update the RAG query
+              logger.debug(f"Querying RAG Again")
+              query_results = rag.query(topic)
+              logger.info(query_results)
+              if interrupt_count.value > 0:
+                interrupt_actions(text, info="Querying RAG")
+                continue
+
+              speech_thread.join()
+
+          logger.debug(f"Info in RAG exists, no search needed")
+          
+          # Parse contents from RAG query
+          for result in query_results:
+            context += result["content"]
+        else:
+          logger.debug("RAG and/or web search disabled, proceeding without context")
 
         # Send text and context to LLM for response
         logger.debug("Sending to LLM")
@@ -296,7 +322,9 @@ def websearch_llm_tts_worker(
         
         if not TTS_AUDIO_STREAMING:
           logger.debug("Playing response")
+          avatar_queue.put("playback")
           audio_speaker.play_wav_file(output_buffer)
+          avatar_queue.put("listening")
           if interrupt_count.value > 0:
             interrupt_actions(text, info="Playing Speech")
             continue
@@ -307,10 +335,6 @@ def websearch_llm_tts_worker(
 
         # after finishing work, pop out end marker
         command_queue.get()
-        
-      elif marker == "finish":
-        #only possible if pipeline was interrupted
-        interrupt_count.value -= 1
 
 def main():
   listener = start_listener()
@@ -318,14 +342,36 @@ def main():
   log_queue = get_log_queue()
   
   command_queue = Queue()
+  command_queue_lock = Lock()
+  avatar_queue = Queue()
   interrupt_count = Value("i", 0)
   voice_setup_event = Event()
   pipeline_setup_event = Event()
   # initialize first here to prevent race condition to initialize later
   audio_speaker = AudioOutputter(interrupt_count, logger)
+  vrc_avatar = VRCAvatar()
   
-  voice_worker = Process(target=wake_word_stt_worker, args=(interrupt_count, voice_setup_event, pipeline_setup_event, command_queue, log_queue))
-  pipeline_worker = Process(target=websearch_llm_tts_worker, args=(interrupt_count, voice_setup_event, pipeline_setup_event, command_queue, log_queue))
+  # Avatar state processor thread
+  def avatar_state_processor():
+    while True:
+      try:
+        state = avatar_queue.get(timeout=1)
+        if state == "idle":
+          vrc_avatar.set_idle()
+        elif state == "playback":
+          vrc_avatar.set_playback()
+        elif state == "interrupted":
+          vrc_avatar.set_interrupted()
+        elif state == "listening":
+          vrc_avatar.set_listening()
+      except:
+        continue
+  
+  avatar_thread = threading.Thread(target=avatar_state_processor, daemon=True)
+  avatar_thread.start()
+  
+  voice_worker = Process(target=wake_word_stt_worker, args=(interrupt_count, voice_setup_event, pipeline_setup_event, command_queue, avatar_queue, command_queue_lock, log_queue))
+  pipeline_worker = Process(target=websearch_llm_tts_worker, args=(interrupt_count, voice_setup_event, pipeline_setup_event, command_queue, avatar_queue, command_queue_lock, log_queue))
   
   logger.debug("Starting Processes")
   voice_worker.start()
